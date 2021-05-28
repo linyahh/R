@@ -1,0 +1,20 @@
+{
+  "articles": [
+    {
+      "path": "about.html",
+      "title": "About this blog",
+      "description": "Some additional details about the blog",
+      "author": [],
+      "contents": "\r\n\r\n\r\n\r\n",
+      "last_modified": "2021-05-27T00:43:54+08:00"
+    },
+    {
+      "path": "index.html",
+      "title": "Linya Huang",
+      "author": [],
+      "contents": "\r\n\r\n\r\n\r\n",
+      "last_modified": "2021-05-27T00:44:08+08:00"
+    }
+  ],
+  "collections": ["posts/posts.json"]
+}
