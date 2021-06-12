@@ -1,0 +1,64 @@
+---
+title: "DataViz Makeover2"
+description: |
+  A introduction of making interactive dashboard in Tableau!
+author:
+  - name: Linya Huang
+    url: https://www.linkedin.com/in/linya-huang/
+date: 06-12-2021
+output:
+  distill::distill_article:
+    toc: true
+    toc_depth: 6
+    self_contained: false
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+# 1. Introduction
+
+
+
+
+# 2. Asessment of Clarity and Aesthetics in Original Design
+
+**Clarity**
+
+1. **Unclear Title** The title should be tuned with Singapore added in.
+
+2. **Misleading circle presentation** By applying total trading value as size, some countries have circle occupying both net importers and net exporter areas, readers may not understand the roles of counties around diagonal area. 
+
+3.**No key insights annotation** The only key insights reader get at the first glance is the top net importer/exporter countries with marked star and animated arrows, but more insights should have been derived from the visualization.
+Meanwhile, the only note in the bottom describes the information of China and US since 2009 and 2006, which mismatches the main visualization showing trading value of 2020.
+
+4.**Unclear x-y axis label** The label of both axis should be moved to right and top respectively, although it has been differentiated by different color, putting them together at the zero point is not a wise choice. And currency unit should also been added in both axis.
+
+**Aesthetics**
+
+1. **Poor use of color** There are 10 different solid circle with white dot center representing countries, as well as 2 different colors representing background and axis ticks in the chart, making the whole design too colorful for professional business/economy data presentation. Also, the blue and green globe circle is very redundant for axis labels.
+
+2. **Crowded labels and circles** Due to the crowded design, some circles and labels are overlapping with each other and some currency label is missing. Besides, some label are even exceeded the main chart. This is a very poor use of scatter plot and labels. 
+
+3. **Poor Animation** The design of flashing up/down arrow in the stars is meaningless. In addition, when hovering mouse to countries, the vibration does not provide additional insights at all.
+
+**Suggestions to based on original design**
+
+1. **Improvement of color and scatter circle** Try to apply only 2 color to represent importer and exporter countries, and remove background color and circle for axis label. Revise opacity of circle and add boarder to avoid overlap area and distinguish countries.
+
+2. **Fine-tune text elements** Revise labels and title and add key insights.
+
+3.**Remove meaningless animations** Remove all animations in the chart.
+
+# 3. Alternative Design Sketches and Published Dashboard
+
+# 4. Tableau Tutorial Step-by-Step
+
+## 4.1 Data Preparation in Tableau Prep
+
+## 4.2 Data Makeover in Tableau Desktop
+
+
+# 5. Major Observations 
