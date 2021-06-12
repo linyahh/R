@@ -36,7 +36,7 @@ In this blog, I will explore different perspectives and approaches to improve th
 
 
 
-# 2. Asessment of clarity and aesthetics in original design
+# 2. Asessment of Clarity and Aesthetics in Original Design
 
 In the first stage, let's examine the original visualization in two aspects __Clarity__ and __Aesthetics__.
 
