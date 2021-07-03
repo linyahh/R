@@ -1,0 +1,161 @@
+---
+title: "GeoVisual with R"
+description: |
+ In class exercise - Handling Geospatial Data with R and Visualizing Geospatial Data with R.
+author:
+  - name: Linya Huang
+    url: https://www.linkedin.com/in/linya-huang/
+date: 07-03-2021
+output:
+  distill::distill_article:
+    toc: true
+    toc_depth: 6
+    self_contained: false
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,message = FALSE)
+```
+
+# Install and Launch R packages
+
+Insert an R code chunk either using the RStudio toolbar (the Insert button) or the keyboard shortcut Ctrl + Alt + I (Cmd + Option + I on macOS).
+
+
+```{r, include=TRUE,message = FALSE}
+packages= c('raster','sf','clock','tmap','tidyverse')
+
+for(p in packages){
+  if(!require(p,character.only= T)){
+    install.packages(p)
+    }
+  library(p, character.only = T)
+}
+```
+
+# Import **Raster** File
+
+
+multiple bands - 3 different sublayers (RGB)
+
+dimension - rows*columns
+
+resolution - pixel size
+
+crs - distance is in decimal, measurement will require scale manipulation
+
+```{r}
+ap<- raster("data/geospatial/MC2-tourist.tif")
+ap
+```
+# Apply mapping packages in R - **tmap**
+
+Plot Raster Layer
+
+```{r}
+bgmap<-ap
+
+tmap_mode("plot") #interactive view
+
+tm_shape(bgmap) +
+  tm_raster(bgmap,
+            legend.show = FALSE) # read as single band, not very useful in our case
+```
+
+```{r}
+tmap_mode("plot") #interactive view
+
+tm_shape(bgmap) +
+  tm_rgb(bgmap, r=1, g=2, b=3,
+         alpha=NA,
+         saturation = 1,
+         interpolate = TRUE,
+         max.value = 255)
+```
+# Import Vector GIS Data File **st_read**
+
+Geodetic CRS:  [WGS 84](https://en.wikipedia.org/wiki/World_Geodetic_System) -pay attention to this projection
+
+```{r}
+Ablia_st <- st_read(dsn="data/Geospatial",layer="Abila") # no need to add extension
+```
+# Import Aspatial Data 
+
+timesamp filed is not in data-time format
+id filed should be in factor data type
+
+```{r}
+gps <- read_csv("data/aspatial/gps.csv")
+glimpse(gps) #nice tidyverse function
+```
+
+## convert date-time filed [clock](https://clock.r-lib.org/)
+
+```{r}
+
+gps$Timestamp <- date_time_parse(gps$Timestamp,
+                                 zone="",
+                                 format = "%m/%d/%Y %H:%M:%S")
+gps$id <- as_factor(gps$id)
+  
+gpsl <- gps %>%
+  filter(Timestamp < "2014-01-06 23:59:00")
+  
+```
+
+```{r}
+
+gpsl <- gps %>%
+  filter(Timestamp < "2014-01-06 23:59:00")
+  
+```
+
+```{r}
+
+gps
+  
+```
+
+# Convert aspatial data into a simple feature data frame
+
+```{r}
+gps_sf <- st_as_sf(gps,
+                   coords = c("long","lat"),
+                  crs= 4326)
+
+gps_sf # geometry feature 
+```
+
+# Create Movement Path from GPS Points
+
+use driver ID as unique identifiers
+
+```{r}
+
+gps_path <- gps_sf %>%
+  group_by(id) %>%
+  summarize(m=mean(Timestamp),  # for group by purpose , no meaning at all,just to summary
+            do_union=FALSE) %>%
+  st_cast("LINESTRING")
+
+gps_path 
+```
+
+# Plot the gps Paths
+
+```{r}
+gps_path_selected <- gps_path %>%
+  filter(id==1)
+
+tmap_mode("view") # static mode
+tm_shape(bgmap) +
+  tm_rgb(bgmap, r=1, g=2, b=3,
+         alpha=NA,
+         saturation = 1,
+         interpolate = TRUE,
+         max.value = 255)+
+  tm_shape(gps_path_selected)+
+  tm_lines()
+```
+

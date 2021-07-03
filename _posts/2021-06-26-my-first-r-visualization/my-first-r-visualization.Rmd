@@ -5,7 +5,7 @@ description: |
 author:
   - name: Linya Huang
     url: https://www.linkedin.com/in/linya-huang/
-date: 06-26-2021
+date: 07-03-2021
 output:
   distill::distill_article:
     toc: true
@@ -18,13 +18,13 @@ output:
 knitr::opts_chunk$set(echo = TRUE,message = FALSE)
 ```
 
-## Installing and Launching R packages
+## Install and Launch R packages
 
 Insert an R code chunk either using the RStudio toolbar (the Insert button) or the keyboard shortcut Ctrl + Alt + I (Cmd + Option + I on macOS).
 
 
 ```{r, include=TRUE,message = FALSE}
-packages= c('DT','ggiraph','plotly','tidyverse')
+packages= c('DT','ggiraph','plotly','tidyverse','DT')
 
 for(p in packages){
   if(!require(p,character.only= T)){
@@ -163,6 +163,135 @@ girafe(
   width_svg = 6,
   height_svg = 6*0.618
   )
+```
+# [plotly](https://plotly.com/r/)
+
+## Basic
+
+```{r}
+
+pal <- c("purple","blue","grey","yellow")
+plot_ly(data=exam_data,
+        x=~MATHS,
+        y=~ENGLISH,
+        color = ~RACE,
+        colors = pal)
+```
+
+Tooltips
+```{r}
+
+pal <- c("purple","blue","grey","yellow")
+plot_ly(data=exam_data,
+        x=~MATHS,
+        y=~ENGLISH,
+        text= ~paste("Student ID:",ID,
+                     "<br>Class:",CLASS),
+        color = ~RACE,
+        colors = pal)
+```
+
+Layout
+
+```{r}
+
+pal <- c("purple","blue","grey","yellow")
+plot_ly(data=exam_data,
+        x=~MATHS,
+        y=~ENGLISH,
+        text= ~paste("Student ID:",ID,
+                     "<br>Class:",CLASS),
+        color = ~RACE,
+        colors = pal) %>%
+  layout(title="English Score versus Math Score",
+         xaxis=list(range=c(0,100)),
+         yaxis=list(range=c(0,100)))
+```
+
+
+
+ggplotly
+
+```{r, error=FALSE}
+p<-ggplot(exam_data, 
+       aes(x=MATHS,
+           y=ENGLISH))+
+  geom_point(dotsize=1)+
+  xlim(0, 100)+ylim(0, 100)+
+  geom_abline(coef = c(0,1))
+
+ggplotly(p)
+```
+## Coordinated Multiple Views with **[plotly](https://plotly.com/r/subplots/)**
+
+
+```{r}
+p1<-ggplot(exam_data, 
+       aes(x=MATHS,
+           y=ENGLISH))+
+  geom_point(dotsize=1)+
+  xlim(0, 100)+ylim(0, 100)+
+  geom_abline(coef = c(0,1))
+
+p2<-ggplot(exam_data, 
+       aes(x=MATHS,
+           y=SCIENCE))+
+  geom_point(dotsize=1)+
+  xlim(0, 100)+ylim(0, 100)+
+  geom_abline(coef = c(0,1))
+
+subplot(ggplotly(p1),
+        ggplotly(p2))
+```
+## Highlight_key creates an pbject of class **crosstalk::SharedData**
+ 
+```{r}
+d <- highlight_key(exam_data)
+p1<-ggplot(data=d, 
+       aes(x=MATHS,
+           y=ENGLISH))+
+  geom_point(dotsize=1)+
+  xlim(0, 100)+ylim(0, 100)+
+  geom_abline(coef = c(0,1))
+
+p2<-ggplot(data=d, 
+       aes(x=MATHS,
+           y=SCIENCE))+
+  geom_point(dotsize=1)+
+  xlim(0, 100)+ylim(0, 100)+
+  geom_abline(coef = c(0,1))
+
+subplot(ggplotly(p1),
+        ggplotly(p2))
+```
+
+## **[DT](https://rstudio.github.io/DT/)**
+
+```{r}
+DT::datatable(exam_data)
+
+
+```
+
+## **Linked Brushing**: crosstalk method
+
+-interactive selection between plot and table
+
+```{r}
+d <- highlight_key(exam_data)
+p1<-ggplot(data=d, 
+       aes(x=MATHS,
+           y=ENGLISH))+
+  geom_point(dotsize=1)+
+  xlim(0, 100)+ylim(0, 100)+
+  geom_abline(coef = c(0,1))
+
+gg<-highlight(ggplotly(p1),"plotly_selected") 
+
+crosstalk::bscols(gg,
+                  DT::datatable(d),
+                  widths = 5)
+
 ```
 
 
