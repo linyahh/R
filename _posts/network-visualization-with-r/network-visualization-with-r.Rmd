@@ -1,0 +1,278 @@
+---
+title: "Network Visualization with R"
+description: |
+  Network Visualization with R
+author:
+  - name: Linya Huang
+    url: https://www.linkedin.com/in/linya-huang/
+date: 07-10-2021
+output:
+  distill::distill_article:
+    toc: true
+    toc_depth: 6
+    self_contained: false
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.retina = 3,
+  echo = TRUE,
+                      eval = TRUE,
+                      message = FALSE,
+                      warning=FALSE)
+```
+
+
+
+# Import Data
+
+```{r}
+packages= c('igraph','tidygraph','ggraph','visNetwork',
+            'lubridate','clock','tidyverse')
+
+for(p in packages){
+  if(!require(p,character.only= T)){
+    install.packages(p)
+    }
+  library(p, character.only = T)
+}
+```
+
+```{r}
+GAStech_nodes <- read_csv("data/GAStech_email_node.csv")
+GAStech_edges <- read_csv("data/GAStech_email_edge-v2.csv")
+
+glimpse(GAStech_edges)
+```
+# Wrangling time
+
+
+```{r}
+GAStech_edges$SentDate <- dmy(GAStech_edges$SentDate)
+
+GAStech_edges$Weekday = wday(GAStech_edges$SentDate,
+                             label=TRUE,
+                             abbr=FALSE)
+
+glimpse(GAStech_edges)
+
+```
+# Wrangling attributes
+
+Aggregate the individual by date, senders, receivers, main subject and day of the week.
+
+```{r}
+GAStech_edges_aggregated <- GAStech_edges %>%
+  filter(MainSubject=="Work related") %>%
+  group_by(source, target, Weekday) %>%
+  summarise(Weight=n()) %>% #count 
+  filter(source!=target)%>%  #remove archive email
+  filter(Weight>1)%>%
+  ungroup() 
+
+glimpse(GAStech_edges_aggregated)
+```
+# Create tbl_graph() to build tidygraph date model
+
+```{r}
+GAStech_graph <- tbl_graph(nodes = GAStech_nodes, # id much match target edges
+                           edges= GAStech_edges_aggregated,
+                           directed=TRUE)
+
+GAStech_graph 
+```
+```{r}
+GAStech_graph <- tbl_graph(nodes = GAStech_nodes, # id much match target edges
+                           edges= GAStech_edges_aggregated,
+                           directed=TRUE)
+
+GAStech_graph 
+```
+
+# Plot a basic network graph
+
+__ggraph__
+```{r}
+ggraph(GAStech_graph)+
+  geom_edge_link() +
+  geom_node_point()
+```
+
+## remove background
+
+```{r}
+g<-ggraph(GAStech_graph)+
+  geom_edge_link(aes()) +
+  geom_node_point(aes())
+
+g + theme_graph()
+```
+## change the color of plot
+
+
+```{r}
+g<-ggraph(GAStech_graph)+
+  geom_edge_link(aes(color='grey50')) +
+  geom_node_point(aes(color='grey40'))
+
+g + theme_graph(background = "black")
+```
+
+## Fruchterman and Reingold layout
+
+```{r}
+g<-ggraph(GAStech_graph,layout='fr')+
+  geom_edge_link(aes()) +
+  geom_node_point(aes())
+
+g + theme_graph()
+```
+
+## modify network nodes
+
+```{r}
+g<-ggraph(GAStech_graph,layout='nicely')+
+  geom_edge_link(aes()) +
+  geom_node_point(aes(colour=Department,
+                      size=3))
+
+g + theme_graph()
+```
+
+## modify edges
+
+```{r}
+g<-ggraph(GAStech_graph,layout='nicely')+
+  geom_edge_link(aes(width=Weight),
+                 alpha=0.2) +
+  scale_edge_width(range=c(0.1,5))+
+  geom_node_point(aes(colour=Department,
+                      size=3))
+
+g + theme_graph()
+```
+
+
+## creact facet graphs
+
+how interaction change over weekdays
+```{r}
+
+set_graph_style()
+
+g<-ggraph(GAStech_graph,layout='nicely')+
+  geom_edge_link(aes(width=Weight),
+                 alpha=0.2) +
+  scale_edge_width(range=c(0.1,5))+
+  geom_node_point(aes(colour=Department,
+                      size=3))+
+  theme(legend.position = 'bottom')
+
+g + facet_edges(~Weekday)
+```
+
+high intensity on Tuesday bwteern Administration,Executive and Security department
+
+
+
+```{r}
+
+set_graph_style()
+
+g<-ggraph(GAStech_graph,layout='nicely')+
+  geom_edge_link(aes(width=Weight),
+                 alpha=0.2) +
+  scale_edge_width(range=c(0.1,5))+
+  geom_node_point(aes(colour=Department,
+                      size=3))
+  
+
+g + facet_nodes(~Department)+
+  th_foreground(foreground = "grey80",
+                border = TRUE)+
+  theme(legend.position = 'bottom')
+```
+
+
+# Network Metrics Analysis
+
+```{r}
+
+g<-GAStech_graph %>%
+  #mutate(betweeness_centrality=centrality_betweenness()) %>%
+  ggraph(layout='fr')+
+  geom_edge_link(aes(width=Weight),
+                 alpha=0.2)+
+  scale_edge_width(range = c(0.1,5))+
+  geom_node_point(aes(colour=Department,
+                      size=centrality_betweenness()))
+  
+
+g + theme_graph()
+
+
+```
+
+## Visualize community
+
+```{r}
+
+g<-GAStech_graph %>%
+  mutate(community= as.factor(group_edge_betweenness(weight=Weight,directed = TRUE))) %>%
+  ggraph(layout='fr')+
+  geom_edge_link(aes(width=Weight),
+                 alpha=0.2)+
+  scale_edge_width(range = c(0.1,5))+
+  geom_node_point(aes(colour=community))
+  
+
+g + theme_graph()
+
+```
+
+# Interactive Network Visualization
+
+##Data Prep
+
+```{r}
+GAStech_edges_aggregated <- GAStech_edges %>%
+  left_join(GAStech_nodes,by=c("sourceLabel"="label")) %>%
+  rename(from=id) %>%
+  left_join(GAStech_nodes,by=c("targetLabel"="label"))%>%
+  rename(to=id) %>%
+  filter(MainSubject=="Work related") %>%
+  group_by(from,to)%>%
+  summarise(weight=n())%>%
+  filter(from!=to)%>%
+  filter(weight>1)%>%
+  ungroup()
+
+GAStech_edges_aggregated
+```
+## __visNetwork__
+```{r}
+visNetwork(GAStech_nodes,
+           GAStech_edges_aggregated) %>%
+  visIgraphLayout(layout = "layout_with_fr")
+```
+
+
+## visual attributed- nodes
+```{r}
+GAStech_nodes <- GAStech_nodes %>%
+  rename(group=Department)
+```
+
+
+```{r}
+visNetwork(GAStech_nodes,
+           GAStech_edges_aggregated) %>%
+  visIgraphLayout(layout = "layout_with_fr") %>%
+  visOptions(highlightNearest = TRUE,
+             nodesIdSelection = TRUE)%>%
+  visLegend() %>%
+visLayout(randomSeed = 123) 
+```
+
+
+

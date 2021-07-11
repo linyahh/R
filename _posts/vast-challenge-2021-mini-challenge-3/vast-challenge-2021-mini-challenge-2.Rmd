@@ -1,0 +1,252 @@
+---
+title: " VAST Challenge 2021 -Mini-Challenge 3"
+description: |
+  A short description of the post.
+author:
+  - name: Linya Huang
+    url: https://www.linkedin.com/in/linya-huang/
+date: 07-03-2021
+output:
+  distill::distill_article:
+    toc: true
+    toc_depth: 6
+    self_contained: false
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.retina = 3,
+  echo = TRUE,
+                      eval = TRUE,
+                      message = FALSE,
+                      warning=FALSE)
+```
+
+# 1.Introduction
+
+
+
+# 2.Literature Review
+
+
+
+# 3.Data Preprocessing and Exploratory
+
+## 3.1 Import packages and social media stream data
+
+```{r}
+packages= c('raster','sf','clock','tmap',
+            'tidyverse','data.table','lubridate',
+            'textclean','tm','wordcloud','wordcloud2','text2vec',
+            'topicmodels','tidytext','textmineR','quanteda',
+            'BTM','textplot','concaveman')
+
+for(p in packages){
+  if(!require(p,character.only= T)){
+    install.packages(p)
+    }
+  library(p, character.only = T)
+}
+```
+```{r}
+#install.packages("devtools")
+library(devtools)
+#install_github("cbail/textnets")
+library(textnets)
+```
+
+
+
+```{r}
+#read csv file
+data_17_1830=read_csv("data/MC3/csv-1700-1830.csv")
+data_1830_20=read_csv("data/MC3/csv-1831-2000.csv")
+data_20_2130=read_csv("data/MC3/csv-2001-2131.csv")
+
+#append data
+
+data=rbindlist(list(data_17_1830,data_1830_20,data_20_2130))
+
+#print head of data
+head(data)
+
+```
+ 
+
+## 3.2 Change date type
+
+```{r}
+
+#timestamp in lubridate
+data$timestamp <- ymd_hms(data$`date(yyyyMMddHHmmss)`)
+
+```
+
+## Data Exploratory
+  
+  •1. Number of post throughout the time period
+  
+  
+```{r}
+data$time_1min = cut(data$timestamp, breaks="1 min")
+ 
+count <- data %>%
+  group_by(type,time_1min) %>%
+  summarise(count_of_posts= n_distinct(message))
+
+count$time_1min=ymd_hms(count$time_1min)
+#count$time_1min=format(count$time_1min,format = "%H:%M:%S") 
+
+
+ggplot(count,aes(x=time_1min,y=count_of_posts,fill=type))+
+         geom_bar(stat="identity",position="dodge")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ggtitle("Total Number of Posts through the period")
+
+
+```
+```{r}
+head(count[order(-count$count_of_posts),],10)
+```
+ 
+ With time interval at 1 minute, the number of posts trend is plotted as above. The peaks is observed during time 19:40-19:50. And the posts are also active around time 18:45:00 and 20:10:00.
+ 
+ 
+ 
+## Text Data Preprocessing
+
+```{r}
+
+
+data$cleaned<-
+  tolower(data$message)%>%   # transform all message to lower cases
+  replace_contraction()%>%   #replace contractions with long form
+  replace_word_elongation()%>% #remove the same letter (case insensitive) appears 3 times consecutively
+  str_replace_all("[0-9]", "") %>% #removing numbers
+  str_replace_all("(^[@#])|[[:punct:]]","")%>% #remove punctuations
+  # leave # and @
+  removeWords(stopwords("english"))%>% 
+  str_squish()%>% #trim whitespace from a string 
+  str_trim #removes whitespace from start and end of string
+
+
+head(subset(data,select=c("message","cleaned")))
+
+
+```
+
+
+
+ 
+```{r}
+
+#convert dataframe to corpus
+docs <- Corpus(VectorSource(as.character(data$cleaned)))
+
+inspect(docs[1:2])
+
+# Create a document-term-matrix
+
+dtm <- TermDocumentMatrix(docs) 
+matrix <- as.matrix(dtm) 
+words <- sort(rowSums(matrix),decreasing=TRUE) 
+
+# words and frequency dataframe
+df <- data.frame(word = names(words),freq=words)
+
+#word cloud
+wordcloud(words = df$word, freq = df$freq, min.freq = 5,           max.words=200, random.order=FALSE, rot.per=0.35,            colors=brewer.pal(8, "Dark2"))
+wordcloud2(data=df, size=1.6, color='random-dark')
+
+```
+
+
+# 4.Data Visualization for Challenge Questions
+
+
+
+#4.1 Using visual analytics, characterize the different types of content in the dataset. What distinguishes meaningful event reports from typical chatter from junk or spam? Please limit your answer to 8 images and 500 words.
+
+
+To distinguish meaningful events related to the kidnap events happened in , firstly, I will perform topic modeling to identify the topic in the microblogs and apply LDAvis visualization for analysis.
+
+```{r}
+wordcorpus <- Corpus(VectorSource(as.character(data$cleaned)))  
+dtm <- DocumentTermMatrix(wordcorpus,
+                          control = list(
+                            wordLengths=c(2, Inf),               # limit word length
+                            bounds = list(global = c(5,Inf)),    # minimum word frequency
+                            removeNumbers = TRUE,                #remove Numbers
+                            weighting = weightTf,                #weighted term frequency
+                            encoding = "UTF-8"))
+
+rowTotals <- apply(dtm , 1, sum) #Find the sum of words in each Document
+dtm.new   <- dtm[rowTotals> 0, ] #remove 0 dtm rows of matrix
+
+topic=LDA(dtm.new,k=10,method="Gibbs",conrol=list(seed=2021,alpha=0.5,iter=200))
+```
+```{r}
+terms(topic,5)
+```
+
+```{r}
+#Tokenize data
+tidytxtdata<- tidy(dtm)
+                    
+tidytxtdata <- tidytxtdata%>% #Remove the count column
+  select(-count)
+tidytxtdata <- tidytxtdata%>% #Change the column name 'term' to 'word' so that we can get rid of stopwords later
+  rename(word = term)
+
+
+#Remove stopwords
+tidytxtdata <- tidytxtdata%>%
+  anti_join(stop_words)
+
+
+#Use the btm model
+set.seed(321)
+model <- BTM(tidytxtdata, k = 20, beta = 0.01, background = TRUE, iter = 500, trace = 100) #Run the model
+
+topicterms <- terms(model, top_n = 10) #View the topics
+topicterms
+```
+```{r}
+library(textplot)
+library(ggraph)
+library(concaveman)
+plot(model)
+```
+
+
+
+#4.2 Use visual analytics to represent and evaluate how the level of the risk to the public evolves over the course of the evening. Consider the potential consequences of the situation and the number of people who could be affected. Please limit your answer to 10 images and 1000 words.
+
+```{r}
+data_2<-data %>%
+     group_by(author) %>%
+     dplyr::summarise(all_posts=paste(cleaned, collapse=" "))
+
+sotu_firsts_nouns <- PrepText(data_2, groupvar = "author", textvar = "all_posts", node_type = "groups", tokenizer = "words", pos = "nouns", remove_stop_words = FALSE, compound_nouns = TRUE)
+
+# <- PrepTextSent(data_2, groupvar = "author", textvar = "cleaned", node_type = "groups", 
+                                      #tokenizer = "words", sentiment_lexicon = "afinn", language = "english", udmodel_lang = #udmodel_lang, remove_numbers = NULL, compound_nouns = TRUE)
+
+sotu_firsts_network <- CreateTextnet(sotu_firsts_nouns)
+
+```
+```{r}
+#VisTextNet(sotu_firsts_network,label_degree_cut = 0)
+VisTextNetD3(sotu_firsts_network)
+```
+
+```{r}
+sotu_firsts_communities <- TextCommunities(sotu_firsts_network)
+top_words_modularity_classes <- InterpretText(sotu_firsts_network, sotu_firsts_nouns)
+text_centrality <- TextCentrality(sotu_firsts_network)
+```
+
+
+#4.3 If you were able to send a team of first responders to any single place, where would it be? Provide your rationale. How might your response be different if you had to respond to the events in real time rather than retrospectively? Please limit your answer to 8 images and 500 words
+
+
