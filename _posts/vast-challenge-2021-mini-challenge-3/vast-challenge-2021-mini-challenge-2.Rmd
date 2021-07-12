@@ -91,26 +91,32 @@ data$timestamp <- ymd_hms(data$`date(yyyyMMddHHmmss)`)
 ```{r}
 data$time_1min = cut(data$timestamp, breaks="1 min")
  
-count <- data %>%
-  group_by(type,time_1min) %>%
-  summarise(count_of_posts= n_distinct(message))
-
-count$time_1min=ymd_hms(count$time_1min)
-#count$time_1min=format(count$time_1min,format = "%H:%M:%S") 
-
-
-ggplot(count,aes(x=time_1min,y=count_of_posts,fill=type))+
-         geom_bar(stat="identity",position="dodge")+
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
-  ggtitle("Total Number of Posts through the period")
-
 
 ```
+```{r}
+
+# ggplot(count,aes(x=time_1min,y=count_of_posts,fill=type))+
+#          geom_bar(stat="identity",position="dodge")+
+#   theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+#   ggtitle("Total Number of Posts through the period")
+
+
+# ggplot(count) + 
+#   geom_point(aes(x=time_1min,y=count_of_posts,colour = type), size = 3) +
+#   geom_line(data = count, aes(x=time_1min,y=count_of_posts))
+
+
+# ggplot(count, aes(x=time_1min,y=count_of_posts,colour = type)) +
+#   geom_point(size = 2.2) +
+#   geom_line(data = count, aes(x=time_1min,y=count_of_posts,colour = type), size = 0.8, colour = 'red')
+
+```
+
 ```{r}
 head(count[order(-count$count_of_posts),],5)
 ```
  
- With time interval at 1 minute, the number of posts trend is plotted as above. The peaks is observed during time 19:40-19:50. And the posts are also active around time 18:45:00 and 20:10:00.
+
  
  
  
@@ -395,6 +401,131 @@ plot(model)
 #4.2 Use visual analytics to represent and evaluate how the level of the risk to the public evolves over the course of the evening. Consider the potential consequences of the situation and the number of people who could be affected. Please limit your answer to 10 images and 1000 words.
 
 
+
+##Number of posts 
+
+```{r}
+count <- data %>%
+  group_by(type,time_1min) %>%
+  summarise(count_of_posts= n_distinct(message))
+
+count$time_1min=ymd_hms(count$time_1min)
+#count$time_1min=format(count$time_1min,format = "%H:%M:%S") 
+
+mean=mean(count$count_of_posts)
+
+ggplot(count,aes(x=time_1min,y=count_of_posts,fill=type))+
+         geom_bar(stat="identity",position="dodge")+
+  # geom_abline(h=mean, col = "black")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  
+  ggtitle("Total Number of Posts through the period")
+```
+With time interval at 1 minute, the number of posts trend is plotted as above. The peaks of both ccdata and mbdata are observed during time 19:40-19:50, 18:45:00 and 20:10:00. 
+
+
+
+
+```{r}
+head(count[order(-count$count_of_posts),],10)
+```
+
+
+##Number of retweets/tweets
+
+```{r}
+data_rt2<-data %>% 
+   #filter(str_detect(message, "fire")) %>% 
+  select(c("author","time_1min","message","RT")) %>% 
+  group_by(time_1min) %>% 
+  summarise(post=n(),
+            rt_post=sum(RT!=""))
+
+data_rt2$time_1min=ymd_hms(data_rt2$time_1min)
+
+
+#ggplot(fire,aes(x=time_1min,y=n))+
+         #geom_bar(stat="identity",position="dodge")+
+  #theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  #ggtitle("Total Number of Posts through the period")
+
+
+ggplot(data_rt2,aes(x=time_1min)) +
+    geom_bar(aes(y=post), stat = "identity",fill = "red") +
+    geom_bar(aes(y=rt_post), stat = "identity",fill = "blue") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+    ggtitle("Tweet and RT")
+
+```
+Another way to detect the active level of microblog is to visualize the proportion of re-tweet/tweet. As shown in the bar graph above, the peak trend coincides with "Total Number of Posts through the period", indicating the people are actively eveloved in the events happening in Abila.
+
+The goverment can monitor the ratio of retweet in community to detect abnormal event.
+
+##Important news source - Mainstream media/ ccdata /KOL
+
+Noticed that the mainstream media (with name starting with capital letter and frequently re-tweet by public) and call center are official media for Abila.
+
+```{r}
+# check if the media is mainstream media
+
+data_RT %>% 
+  filter(RT_from!=author) %>% 
+  count(RT_from) %>% 
+  arrange(desc(n)) %>% 
+  filter(n>10) # filter the retweet over 10 times by public
+
+```
+
+@HomelandIlluminations/@AbilaPost/@KronosStar/@CentralBulletin/@NewsOnlineToday are top5 social media in area of Abila. Their tweet should be closely moniored by government, in particular, when the frequency of re-tweet from the public has rised.
+
+For example for HomelandIlluminations, we can monitor the words and its relationships in re-tweets.
+
+```{r}
+#convert dataframe to corpus
+
+library(udpipe)
+library(igraph)
+library(ggraph)
+library(ggplot2)
+
+data_RT$id <- seq.int(nrow(data_RT))
+data_RT_subset<-data_RT %>% select(c("id","RT_message"))
+data_RT_subset$cleaned <- str_replace_all(data_RT_subset$RT_message, 'rt ', '')
+
+x<-data_RT_subset %>% 
+  unnest_tokens(word, RT_message)
+
+x<-cooccurrence(x, group = "id", term = "word")
+
+plt <- textplot_cooccurrence(x,
+                             title = "Re-tweet Co-occurrences", top_n = 25)
+  
+plt
+```
+
+
+
+
+tf-idf from call center
+
+
+```{r}
+data %>% filter(author=="FriendsOfKronos")
+```
+
+
+
+
+##the most popular retweets – word cloud// textnets
+##real-time co-occurrence of texts
+
+
+
+
+
+
+
+
 At 18:25:00, user GreyCatCollectibles first posted "Smell something funny upstairs - wish this renovation work would get finished!", followed by his post"Yuck - electrical smell is getting worse","OMG -- really smells like smoke now" in 10 minutes, making him the first person detecting the fire at dancing dolphin.
 
 ```{r}
@@ -409,30 +540,7 @@ data %>%
 
 ```
 
-```{r}
-fire<-data %>% 
-   filter(str_detect(message, "fire")) %>% 
-  select(c("author","time_1min","message","RT")) %>% 
-  group_by(time_1min) %>% 
-  summarise(post=n(),
-            rt_post=sum(RT!=""))
 
-fire$time_1min=ymd_hms(fire$time_1min)
-
-
-#ggplot(fire,aes(x=time_1min,y=n))+
-         #geom_bar(stat="identity",position="dodge")+
-  #theme(axis.text.x = element_text(angle = 90, hjust = 1))+
-  #ggtitle("Total Number of Posts through the period")
-
-
-ggplot(fire,aes(x=time_1min)) +
-    geom_bar(aes(y=post), stat = "identity",fill = "red",color = "black",linetype = "longdash") +
-    geom_bar(aes(y=rt_post), stat = "identity",fill = "blue",color = "black") +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1))+
-    ggtitle("Tweet and RT")
-
-```
 
 
 
@@ -455,7 +563,9 @@ regex3 <- "RT @([A-Za-z]+[A-Za-z0-9_]+)(?![A-Za-z0-9_]*\\.) "
 data$RT_pattern<-str_extract_all(data$message, regex, simplify = TRUE)
 data$RT_from<-  str_extract_all(data$RT_pattern, regex2, simplify = TRUE)
 data$RT_message <- str_replace_all(data$message,regex3,"")
+```
 
+```{r}
 data_RT<- data %>% 
   filter(RT_from!="")
 
