@@ -39,7 +39,8 @@ packages= c('raster','sf','clock','tmap',
             'tidyverse','data.table','lubridate',
             'textclean','tm','wordcloud','wordcloud2','text2vec',
             'topicmodels','tidytext','textmineR','quanteda',
-            'BTM','textplot','concaveman')
+            'BTM','textplot','concaveman','ggwordcloud',
+            'qdapDictionaries','textstem')
 
 for(p in packages){
   if(!require(p,character.only= T)){
@@ -106,7 +107,7 @@ ggplot(count,aes(x=time_1min,y=count_of_posts,fill=type))+
 
 ```
 ```{r}
-head(count[order(-count$count_of_posts),],10)
+head(count[order(-count$count_of_posts),],5)
 ```
  
  With time interval at 1 minute, the number of posts trend is plotted as above. The peaks is observed during time 19:40-19:50. And the posts are also active around time 18:45:00 and 20:10:00.
@@ -123,11 +124,13 @@ data$cleaned<-
   replace_contraction()%>%   #replace contractions with long form
   replace_word_elongation()%>% #remove the same letter (case insensitive) appears 3 times consecutively
   str_replace_all("[0-9]", "") %>% #removing numbers
-  str_replace_all("(^[@#])|[[:punct:]]","")%>% #remove punctuations
-  # leave # and @
+  str_replace_all("([,=!.?$+%-&#@])","")%>% #remove punctuations
+  #str_replace_all(c("rt|#hi|#pok|#pokrally|
+  #                #abilapost|#kronosstar|#centralbulletin|@centralbulletin|@kronosstar|rally|aliba"),"")%>% #remove hashtag and rt
   removeWords(stopwords("english"))%>% 
   str_squish()%>% #trim whitespace from a string 
-  str_trim #removes whitespace from start and end of string
+  str_trim %>% 
+  lemmatize_strings()#removes whitespace from start and end of string
 
 
 head(subset(data,select=c("message","cleaned")))
@@ -135,6 +138,9 @@ head(subset(data,select=c("message","cleaned")))
 
 ```
 
+```{r}
+data%>% filter(data$cleaned=="")
+```
 
 
  
@@ -156,26 +162,149 @@ df <- data.frame(word = names(words),freq=words)
 
 #word cloud
 wordcloud(words = df$word, freq = df$freq, min.freq = 5,           max.words=200, random.order=FALSE, rot.per=0.35,            colors=brewer.pal(8, "Dark2"))
-wordcloud2(data=df, size=1.6, color='random-dark')
+#wordcloud2(data=df, size=1.6, color='random-dark')
 
 ```
 
+
+```{r}
+
+#as_datetime(data$time_1min)
+data$timestamp <- ymd_hms(data$`date(yyyyMMddHHmmss)`)
+data$time_30min = cut(data$timestamp, breaks="30 min")
+data$id <- seq.int(nrow(data))
+
+data_subset=subset(data,select=c("time_30min","cleaned"))
+
+```
+
+```{r}
+words_count<-data_subset%>% 
+  unnest_tokens(word, cleaned) %>%
+  count(time_30min,word, sort = TRUE)
+```
+
+
+
+```{r}
+#tf_idf <- words_count %>% 
+#  bind_tf_idf(word,id,n) %>% 
+#  arrange(desc(tf_idf))
+
+
+#tf_idf %>% 
+#  filter(str_detect(newsgroup,"^sci\\.")) %>% 
+#  group_by(newsgroup) %>% 
+#  slice_max(tf_idf,
+#            n=12) %>% 
+#  ungroup() %>% 
+#  mutate(word = reorder(word,
+ #                        tf_idf)) %>% 
+#  ggplot(aes(tf_idf,
+#             word,
+#             fill=newsgroup))+
+ # geom_col(show.legend = FALSE)+
+#  facet_wrap(~newsgroup,
+#             scales="free")+
+ # labs(x="tf-idf",
+#       y=NULL)
+```
 
 # 4.Data Visualization for Challenge Questions
 
 
 
-#4.1 Using visual analytics, characterize the different types of content in the dataset. What distinguishes meaningful event reports from typical chatter from junk or spam? Please limit your answer to 8 images and 500 words.
+## 4.1 Using visual analytics, characterize the different types of content in the dataset. What distinguishes meaningful event reports from typical chatter from junk or spam? Please limit your answer to 8 images and 500 words.
 
 
-To distinguish meaningful events related to the kidnap events happened in , firstly, I will perform topic modeling to identify the topic in the microblogs and apply LDAvis visualization for analysis.
+First the data is split by 30 minutes time interval and perform wordcloud, to visualize the most frequent words in the microblog.
+
+
+```{r}
+
+data$timestamp <- ymd_hms(data$`date(yyyyMMddHHmmss)`)
+data$time_30min = cut(data$timestamp, breaks="30 min")
+data$id <- seq.int(nrow(data))
+
+data_subset=subset(data,select=c("time_30min","cleaned"))
+
+
+usenet_words<-data_subset%>%
+  group_by(time_30min) %>% 
+  unnest_tokens(word, cleaned) %>%
+  count(time_30min,word, sort = TRUE)
+
+
+usenet_words[order(usenet_words$time_30min),]
+
+
+set.seed(1234)
+usenet_words %>%
+  filter(n > 5&n<70) %>%
+ggplot(aes(label = word,
+           size = n)) +
+  geom_text_wordcloud() +
+  theme_minimal() +
+  facet_wrap(~time_30min)
+```
+
+From the visualization, we can tell from 1830-1900 fire at dancing dolphin becomes hot topic, then followed by shooting/cops/police at 1930-2000. And from 2100 words like fire/hostage/van/suspects/explosion were widely discussed online after 2100.
+
+
+
+
+
+
+
+
+Then, TF-IDF 
+```{r}
+tf_idf <- usenet_words%>%
+  bind_tf_idf(word,time_30min, n) %>%
+  arrange(desc(tf_idf))
+
+tf_idf %>%
+  group_by(time_30min) %>%
+  slice_max(tf_idf, 
+            n = 10) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, 
+                        tf_idf)) %>%
+  ggplot(aes(tf_idf, 
+             word, 
+             fill = time_30min)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ time_30min, 
+             scales = "free") +
+  labs(x = "tf-idf", 
+       y = NULL)
+```
+
+
+```{r}
+
+library(qdapDictionaries)
+is.word  <- function(x) x %in% GradyAugmented
+
+tf_idf$is_word<-is.word(tf_idf$word)
+
+tf_idf %>% filter(is_word=="FALSE")
+
+
+tf_idf[order(tf_idf$n),] %>% filter(is_word=="FALSE")
+```
+
+
+
+Then, to distinguish meaningful events from chatter/junk/spam messages, I will then perform topic modeling to identify the topic in the microblogs.
+
 
 ```{r}
 wordcorpus <- Corpus(VectorSource(as.character(data$cleaned)))  
 dtm <- DocumentTermMatrix(wordcorpus,
                           control = list(
                             wordLengths=c(2, Inf),               # limit word length
-                            bounds = list(global = c(5,Inf)),    # minimum word frequency
+                            bounds = list(global = c(1,Inf)),    # minimum word frequency
                             removeNumbers = TRUE,                #remove Numbers
                             weighting = weightTf,                #weighted term frequency
                             encoding = "UTF-8"))
@@ -183,11 +312,54 @@ dtm <- DocumentTermMatrix(wordcorpus,
 rowTotals <- apply(dtm , 1, sum) #Find the sum of words in each Document
 dtm.new   <- dtm[rowTotals> 0, ] #remove 0 dtm rows of matrix
 
-topic=LDA(dtm.new,k=10,method="Gibbs",conrol=list(seed=2021,alpha=0.5,iter=200))
+topic=LDA(dtm.new,k=10,method="Gibbs",conrol=list(seed=2021,alpha=0.01,iter=200))
 ```
+
+
+
+
+Top five words in each topics
+
 ```{r}
 terms(topic,5)
+
 ```
+
+Extract per-topic-per-word probabilities ,β(“beta”), from the model. The higher the value, the more important of the words to the topic.
+
+
+```{r}
+ap_topics <- tidy(topic, matrix = "beta")
+
+
+ap_top_terms <- ap_topics %>%
+  group_by(topic) %>%
+  slice_max(beta, n = 10) %>% 
+  ungroup() %>%
+  arrange(topic, -beta)
+
+ap_top_terms %>%
+  mutate(term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(beta, term, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  scale_y_reordered()
+```
+As shown above, the meaningful event are in topic 1 - police relatedfire at dancing dolphin,topic 2- hostage & injure, topic 7 - van related, topic 10 police and scene related. While for other key words in the topic, we cann
+
+```{r}
+topic_gamma <- tidy(topic, matrix = "gamma")
+topic_gamma <- topic_gamma %>% 
+  group_by(document) %>% 
+  slice(which.max(gamma))
+
+topic_gamma$document<-as.numeric(topic_gamma$document)
+topic_gamma[order(topic_gamma$document),]
+
+```
+
+
+
 
 ```{r}
 #Tokenize data
@@ -222,12 +394,220 @@ plot(model)
 
 #4.2 Use visual analytics to represent and evaluate how the level of the risk to the public evolves over the course of the evening. Consider the potential consequences of the situation and the number of people who could be affected. Please limit your answer to 10 images and 1000 words.
 
+
+At 18:25:00, user GreyCatCollectibles first posted "Smell something funny upstairs - wish this renovation work would get finished!", followed by his post"Yuck - electrical smell is getting worse","OMG -- really smells like smoke now" in 10 minutes, making him the first person detecting the fire at dancing dolphin.
+
+```{r}
+#author_post<-data %>% count(author)
+#author_post[order(author_post$n),]
+```
+
+```{r}
+data %>% 
+   filter(author=="GreyCatCollectibles") %>% 
+  select(c("author","timestamp","message"))
+
+```
+
+```{r}
+fire<-data %>% 
+   filter(str_detect(message, "fire")) %>% 
+  select(c("author","time_1min","message","RT")) %>% 
+  group_by(time_1min) %>% 
+  summarise(post=n(),
+            rt_post=sum(RT!=""))
+
+fire$time_1min=ymd_hms(fire$time_1min)
+
+
+#ggplot(fire,aes(x=time_1min,y=n))+
+         #geom_bar(stat="identity",position="dodge")+
+  #theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  #ggtitle("Total Number of Posts through the period")
+
+
+ggplot(fire,aes(x=time_1min)) +
+    geom_bar(aes(y=post), stat = "identity",fill = "red",color = "black",linetype = "longdash") +
+    geom_bar(aes(y=rt_post), stat = "identity",fill = "blue",color = "black") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+    ggtitle("Tweet and RT")
+
+```
+
+
+
+
+
+
+
+
+  
+```{r}
+
+head(fire)
+```
+
+retrive RT from message
+```{r}
+regex <- "RT @([A-Za-z]+[A-Za-z0-9_]+)(?![A-Za-z0-9_]*\\.)"
+regex2 <- "@([A-Za-z]+[A-Za-z0-9_]+)(?![A-Za-z0-9_]*\\.)"
+regex3 <- "RT @([A-Za-z]+[A-Za-z0-9_]+)(?![A-Za-z0-9_]*\\.) "
+data$RT_pattern<-str_extract_all(data$message, regex, simplify = TRUE)
+data$RT_from<-  str_extract_all(data$RT_pattern, regex2, simplify = TRUE)
+data$RT_message <- str_replace_all(data$message,regex3,"")
+
+data_RT<- data %>% 
+  filter(RT_from!="")
+
+head(data_RT)
+```
+
+```{r}
+data_RT %>% 
+  count(RT_message) %>% 
+  arrange(desc(n))
+
+```
+
+
+
+
+
+```{r}
+nrow(data_RT)
+length(unique(data_RT[["message"]]))
+
+#data_RT<-data_RT %>% select(c("author","message","RT_from"))
+
+
+RT_edges_aggregated <- data_RT %>%
+  group_by(RT_from,author) %>%
+    summarise(Weight = n()) %>%
+  filter(Weight > 1) %>%
+  ungroup()
+
+data_RT
+
+
+RT_graph <- tbl_graph(
+                           edges = RT_edges_aggregated, 
+                           directed = TRUE)
+
+```
+
+```{r}
+g <- ggraph(RT_graph, 
+            layout = "nicely") + 
+  geom_edge_link(aes()) +
+  geom_node_point(aes(size = 3))
+g + theme_graph()
+```
+
+
+```{r}
+data_RT %>% 
+  group_by(RT_from,RT_message,author) %>% 
+  count(timestamp) %>% 
+  ungroup()
+
+
+RT_edges_aggregated <- data_RT %>%
+  group_by(message,author) %>%
+    summarise(Weight = n()) %>%
+  filter(Weight >= 1) %>%
+  ungroup()
+
+RT_edges_aggregated 
+
+
+RT_graph <- tbl_graph(
+                           edges = RT_edges_aggregated, 
+                           directed = TRUE)
+
+g <- ggraph(RT_graph, 
+            layout = "nicely") + 
+  geom_edge_link(aes()) +
+  geom_node_point(aes(size = 3))
+g + theme_graph()
+  
+```
+
+messages from call center 
+
+
+```{r}
+packages= c('raster','sf','clock','tmap','tidyverse')
+
+for(p in packages){
+  if(!require(p,character.only= T)){
+    install.packages(p)
+    }
+  library(p, character.only = T)
+}
+```
+
+
+```{r}
+bgmap<- raster("data/MC3/Geospatial/MC2-tourist.tif")
+bgmap
+
+tmap_mode("plot") #interactive view
+
+tm_shape(bgmap) +
+  tm_rgb(bgmap, r=1, g=2, b=3,
+         alpha=NA,
+         saturation = 1,
+         interpolate = TRUE,
+         max.value = 255)
+```
+
+
+```{r}
+cc_data<-data %>% 
+  filter(type=="ccdata")
+
+docs <- Corpus(VectorSource(as.character(cc_data$cleaned)))
+
+inspect(docs[1:2])
+
+# Create a document-term-matrix
+
+dtm <- TermDocumentMatrix(docs) 
+matrix <- as.matrix(dtm) 
+words <- sort(rowSums(matrix),decreasing=TRUE) 
+
+# words and frequency dataframe
+df <- data.frame(word = names(words),freq=words)
+
+#word cloud
+wordcloud(words = df$word, freq = df$freq, min.freq = 5,           max.words=200, random.order=FALSE, rot.per=0.35,            colors=brewer.pal(8, "Dark2"))
+
+
+```
+
+```{r}
+write.csv(data,"data/data.csv")
+```
+
+
+
+Then, frequency of the author
+
+```{r}
+groupby_author<-data %>% 
+  group_by(author) %>% 
+  count %>% 
+  ungroup
+```
+
+
+
 ```{r}
 data_2<-data %>%
      group_by(author) %>%
-     dplyr::summarise(all_posts=paste(cleaned, collapse=" "))
+     dplyr::summarise(all_posts=paste(message, collapse=" "))
 
-sotu_firsts_nouns <- PrepText(data_2, groupvar = "author", textvar = "all_posts", node_type = "groups", tokenizer = "words", pos = "nouns", remove_stop_words = FALSE, compound_nouns = TRUE)
+sotu_firsts_nouns <- PrepText(data_2, groupvar = "author", textvar = "all_posts", node_type = "groups", tokenizer = "tweets", pos = "nouns", remove_stop_words = FALSE, compound_nouns = TRUE)
 
 # <- PrepTextSent(data_2, groupvar = "author", textvar = "cleaned", node_type = "groups", 
                                       #tokenizer = "words", sentiment_lexicon = "afinn", language = "english", udmodel_lang = #udmodel_lang, remove_numbers = NULL, compound_nouns = TRUE)
