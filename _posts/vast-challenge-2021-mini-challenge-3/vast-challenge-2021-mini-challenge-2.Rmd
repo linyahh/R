@@ -24,9 +24,50 @@ knitr::opts_chunk$set(fig.retina = 3,
 
 # 1.Introduction
 
-
+In this report, I will use visual analytics techniques in R to solve questions from [VAST Challenge 2021: Mini-Challenge 3](https://vast-challenge.github.io/2021/MC3.html). The main data set are 1)microblog records that have been identified by automated filters as being potentially relevant to the ongoing incident and 2)text transcripts of emergency dispatches by the Abila, Kronos local police and fire departments.
 
 # 2.Literature Review
+
+Detecting abnormal events ,such as disaster or crisis, from microblog social media has become a trend, as social media has played a pervasive role in the way people behave and think. Nowadays, people are also using time-stamped , geo -located data to share live information about what's happening in their surroundings, which enables the public, government and researches to sense abnormal events in community more quickly and take immediate actions.
+
+## Spatiotemporal Abnormal Detection
+The study from Junghoon et al. (2014) applied spatiotemporal visualization of microblog data to detect disaster and support decisions. The visualization they applied are shown as below,
+
+
+![Distribution of Twitter users of each consecutive date](image/Distribution of Twitter users of each consecutive date.jpg)
+The number of Twitter users who posted Twitter messages containing one of the following keywords: hurricane, storm, and sandy is highly related to Hurricane Sandy (as shown in blue pins and blue lines of the center locations)
+
+Then their study also analyzed spatial pattern of Twitter users after the tornado.
+
+
+![Spatial pattern of Twitter users during 24 h in the city of Moore after damages from a strong tornado.](image/Spatial pattern of Twitter users.jpg)
+(1)the heatmap shows a normal situation of Twitter user distribution in the same area of which the distribution is very different from the situation after the tornado event. As such, the spatial analytics can help with disaster management according to twitter heatmap distribution.
+
+Besides, the abnormality score are calculated with Latent Dirichlet Allocation (LDA) topic modeling and Seasonal-Trend Decomposition to detect severe weather condition.
+
+
+![Abnormality of the first topic](image/Abnormality of the first topic.jpg)
+
+Given the limitation of MC3 data set, we cannot visualize spatial heatmap, but we can try to leverage on LDA modeling and abnormality detection methodology to detect the crisis in Abila community. 
+
+
+## Junk/Spam Detection
+
+In [Visual Analytics Benchmark Repository 2014](http://visualdata.wustl.edu/varepository/VAST%20Challenge%202014/challenges/MC3%20-%20Real-Time,%20Streaming%20Social%20Media/), the submission from [Tianjin University](http://visualdata.wustl.edu/varepository/VAST%20Challenge%202014/challenges/MC3%20-%20Real-Time,%20Streaming%20Social%20Media/entries/Tianjin%20University/) demonstrated a network approach in identifying junk tweet.
+
+![Retweet Network](image/Re-tweet network.png)
+They think "the size of the nodes represents the number of the blog being post. Notice that there are several nodes which have the larger size but no relationship with others which means theirs blogs are ignored by others.". This is a very good intuition to visualize center and edges microblog user. 
+
+However, if we can consider the correlation of text in two blogs would be better.
+
+## 
+
+[Textnets](https://github.com/cbail/textnets) is a R package for automated text analysis using network techniques.It provides network for both text and text entities, which provides visualization ability to uncover correlation of texts in documents.
+
+![Textnet with R](image/Textnet.png) 
+
+This visualization can be applied in the question 2 in answering the potential consequences of the situation and the number of people who could be affected via network graph.
+
 
 
 
@@ -40,7 +81,9 @@ packages= c('raster','sf','clock','tmap',
             'textclean','tm','wordcloud','wordcloud2','text2vec',
             'topicmodels','tidytext','textmineR','quanteda',
             'BTM','textplot','concaveman','ggwordcloud',
-            'qdapDictionaries','textstem')
+            'qdapDictionaries','textstem','devtools','textnets',
+            'ggiraph','plotly','igraph', 'tidygraph', 
+             'ggraph', 'visNetwork','udpipe')
 
 for(p in packages){
   if(!require(p,character.only= T)){
@@ -51,9 +94,8 @@ for(p in packages){
 ```
 ```{r}
 #install.packages("devtools")
-library(devtools)
 #install_github("cbail/textnets")
-library(textnets)
+
 ```
 
 
@@ -64,7 +106,7 @@ data_17_1830=read_csv("data/MC3/csv-1700-1830.csv")
 data_1830_20=read_csv("data/MC3/csv-1831-2000.csv")
 data_20_2130=read_csv("data/MC3/csv-2001-2131.csv")
 
-#append data
+#append 3 dataset
 
 data=rbindlist(list(data_17_1830,data_1830_20,data_20_2130))
 
@@ -81,62 +123,35 @@ head(data)
 #timestamp in lubridate
 data$timestamp <- ymd_hms(data$`date(yyyyMMddHHmmss)`)
 
-```
-
-## Data Exploratory
-  
-  •1. Number of post throughout the time period
-  
-  
-```{r}
 data$time_1min = cut(data$timestamp, breaks="1 min")
- 
-
-```
-```{r}
-
-# ggplot(count,aes(x=time_1min,y=count_of_posts,fill=type))+
-#          geom_bar(stat="identity",position="dodge")+
-#   theme(axis.text.x = element_text(angle = 90, hjust = 1))+
-#   ggtitle("Total Number of Posts through the period")
-
-
-# ggplot(count) + 
-#   geom_point(aes(x=time_1min,y=count_of_posts,colour = type), size = 3) +
-#   geom_line(data = count, aes(x=time_1min,y=count_of_posts))
-
-
-# ggplot(count, aes(x=time_1min,y=count_of_posts,colour = type)) +
-#   geom_point(size = 2.2) +
-#   geom_line(data = count, aes(x=time_1min,y=count_of_posts,colour = type), size = 0.8, colour = 'red')
 
 ```
 
-```{r}
-head(count[order(-count$count_of_posts),],5)
-```
- 
-
  
  
- 
-## Text Data Preprocessing
+## 3.3 Text Data Preprocessing
 
 ```{r}
+rt <- "RT @([A-Za-z]+[A-Za-z0-9_-]+)(?![A-Za-z0-9_]*\\.)"
+ppl <- "@([A-Za-z]+[A-Za-z0-9_-]+)(?![A-Za-z0-9_]*\\.)"
+hash <- "#([A-Za-z]+[A-Za-z0-9_]+)(?![A-Za-z0-9_]*\\.)"
 
-
-data$cleaned<-
-  tolower(data$message)%>%   # transform all message to lower cases
+data$cleaned<-data$message %>% 
+  str_replace_all(rt,"")%>%
+  str_replace_all(ppl,"")%>%
+  str_replace_all(hash,"") %>% 
+  tolower()%>%   # transform all message to lower cases
   replace_contraction()%>%   #replace contractions with long form
   replace_word_elongation()%>% #remove the same letter (case insensitive) appears 3 times consecutively
   str_replace_all("[0-9]", "") %>% #removing numbers
-  str_replace_all("([,=!.?$+%-&#@])","")%>% #remove punctuations
-  #str_replace_all(c("rt|#hi|#pok|#pokrally|
-  #                #abilapost|#kronosstar|#centralbulletin|@centralbulletin|@kronosstar|rally|aliba"),"")%>% #remove hashtag and rt
+  str_replace_all("([,=!.?$+%-&])","")%>% #remove punctuations
+  #str_replace_all("rt|pokrally|kronosstar","")%>%
+  #|#hi|#pok|#pokrally|
+  # #abilapost|#kronosstar|#centralbulletin|@centralbulletin|@kronosstar|rally|aliba") #remove hashtag and rt
   removeWords(stopwords("english"))%>% 
   str_squish()%>% #trim whitespace from a string 
-  str_trim %>% 
   lemmatize_strings()#removes whitespace from start and end of string
+
 
 
 head(subset(data,select=c("message","cleaned")))
@@ -145,9 +160,29 @@ head(subset(data,select=c("message","cleaned")))
 ```
 
 ```{r}
-data%>% filter(data$cleaned=="")
+#data%>% filter(data$cleaned=="")
 ```
+retrive RT from message
+```{r}
+regex <- "RT @([A-Za-z]+[A-Za-z0-9_-]+)(?![A-Za-z0-9_]*\\.)"
+regex2 <- "@([A-Za-z]+[A-Za-z0-9_-]+)(?![A-Za-z0-9_]*\\.)"
+regex3 <- "RT @([A-Za-z]+[A-Za-z0-9_-]+)(?![A-Za-z0-9_]*\\.) "
+regex4 <- "#([A-Za-z]+[A-Za-z0-9_]+)(?![A-Za-z0-9_]*\\.)"
 
+data$RT_pattern<-str_extract_all(data$message, regex, simplify = TRUE)
+data$RT_from<-  str_extract_all(data$RT_pattern, regex2, simplify = TRUE)
+data$RT_from<-  str_replace(data$RT_from, "@","")
+data$RT_message <- str_replace_all(data$message,regex3,"")
+
+data$hashtag <- str_extract_all(data$message, regex2, simplify = FALSE)
+data$user_mentioned <- str_extract_all(data$message, regex4, simplify = FALSE)
+
+
+data_RT<- data %>% 
+  filter(RT_from!="")
+
+#head(data)
+```
 
  
 ```{r}
@@ -191,31 +226,6 @@ words_count<-data_subset%>%
 ```
 
 
-
-```{r}
-#tf_idf <- words_count %>% 
-#  bind_tf_idf(word,id,n) %>% 
-#  arrange(desc(tf_idf))
-
-
-#tf_idf %>% 
-#  filter(str_detect(newsgroup,"^sci\\.")) %>% 
-#  group_by(newsgroup) %>% 
-#  slice_max(tf_idf,
-#            n=12) %>% 
-#  ungroup() %>% 
-#  mutate(word = reorder(word,
- #                        tf_idf)) %>% 
-#  ggplot(aes(tf_idf,
-#             word,
-#             fill=newsgroup))+
- # geom_col(show.legend = FALSE)+
-#  facet_wrap(~newsgroup,
-#             scales="free")+
- # labs(x="tf-idf",
-#       y=NULL)
-```
-
 # 4.Data Visualization for Challenge Questions
 
 
@@ -246,7 +256,8 @@ usenet_words[order(usenet_words$time_30min),]
 
 set.seed(1234)
 usenet_words %>%
-  filter(n > 5&n<70) %>%
+  group_by(time_30min) %>% 
+  slice_max(order_by = n, n = 20) %>% 
 ggplot(aes(label = word,
            size = n)) +
   geom_text_wordcloud() +
@@ -254,55 +265,56 @@ ggplot(aes(label = word,
   facet_wrap(~time_30min)
 ```
 
-From the visualization, we can tell from 1830-1900 fire at dancing dolphin becomes hot topic, then followed by shooting/cops/police at 1930-2000. And from 2100 words like fire/hostage/van/suspects/explosion were widely discussed online after 2100.
+From the visualization, we can tell the main content discussing in the community are
+
+1700-1830 pok rally in park with several name mentioned such as cylvia, jakab, viktor
+1830-1930 fire at dancing dolphin partment, police and evacuation.
+1930-2000 shooting and cops/police
+2100-2130 van/ hostage/ explosion
 
 
+Then, by applying Term Frequency – Inverse document frequency (tf-idf) to bigram texts, we can uncover more information compared with unigrams. 
 
-
-
-
-
-
-Then, TF-IDF 
 ```{r}
-tf_idf <- usenet_words%>%
+
+
+bigrams <- data_subset%>%
+  group_by(time_30min)%>%
+  unnest_tokens(word, 
+                cleaned, 
+                token = "ngrams", 
+                n = 2) %>%
+  count(time_30min,word, sort = TRUE)
+
+
+tf_idf <- bigrams%>%
   bind_tf_idf(word,time_30min, n) %>%
   arrange(desc(tf_idf))
 
 tf_idf %>%
   group_by(time_30min) %>%
-  slice_max(tf_idf, 
+  slice_max(tf_idf,
             n = 10) %>%
   ungroup() %>%
-  mutate(word = reorder(word, 
+  mutate(word = reorder(word,
                         tf_idf)) %>%
-  ggplot(aes(tf_idf, 
-             word, 
+  ggplot(aes(tf_idf,
+             word,
              fill = time_30min)) +
   geom_col(show.legend = FALSE) +
-  facet_wrap(~ time_30min, 
+  facet_wrap(~ time_30min,
              scales = "free") +
-  labs(x = "tf-idf", 
+  labs(x = "tf-idf bigram",
        y = NULL)
 ```
 
 
-```{r}
-
-library(qdapDictionaries)
-is.word  <- function(x) x %in% GradyAugmented
-
-tf_idf$is_word<-is.word(tf_idf$word)
-
-tf_idf %>% filter(is_word=="FALSE")
-
-
-tf_idf[order(tf_idf$n),] %>% filter(is_word=="FALSE")
-```
+Without having to process more on data, the contents of the microblogs with 30 mins time interval is even more informative.
+For instance, from 1700-1800, we know that police presense at pok rally and Dr. Audrey is mentioned several times from 1800. Then from 1830 , fire occurs at dolphin apartment and followed by evacuation. Then, from 1930, a shot/gun fire happened with police involved, followed by injured firefighter and  hospitalization. And from 2100 suspects were arrested and followed by an explosion at dolphin apartment from 2130 onward. 
 
 
 
-Then, to distinguish meaningful events from chatter/junk/spam messages, I will then perform topic modeling to identify the topic in the microblogs.
+Then, to distinguish meaningful events from chatter/junk/spam messages, I will then perform topic modeling to identify topic in each microblogs.
 
 
 ```{r}
@@ -310,7 +322,7 @@ wordcorpus <- Corpus(VectorSource(as.character(data$cleaned)))
 dtm <- DocumentTermMatrix(wordcorpus,
                           control = list(
                             wordLengths=c(2, Inf),               # limit word length
-                            bounds = list(global = c(1,Inf)),    # minimum word frequency
+                            bounds = list(global = c(5,Inf)),    # minimum word frequency
                             removeNumbers = TRUE,                #remove Numbers
                             weighting = weightTf,                #weighted term frequency
                             encoding = "UTF-8"))
@@ -320,8 +332,6 @@ dtm.new   <- dtm[rowTotals> 0, ] #remove 0 dtm rows of matrix
 
 topic=LDA(dtm.new,k=10,method="Gibbs",conrol=list(seed=2021,alpha=0.01,iter=200))
 ```
-
-
 
 
 Top five words in each topics
@@ -351,19 +361,51 @@ ap_top_terms %>%
   facet_wrap(~ topic, scales = "free") +
   scale_y_reordered()
 ```
-As shown above, the meaningful event are in topic 1 - police relatedfire at dancing dolphin,topic 2- hostage & injure, topic 7 - van related, topic 10 police and scene related. While for other key words in the topic, we cann
+As shown above, the meaningful keywords can be found in each topic.
 
+Topic 1 - police related as words mentioning police/standoff/crowd 
+Topic 5 - several pok leaders are mentioned
+Topic 6 - resident evacuation and hostages
+Topic 9 - fire at dancing dolphin
+topic 10- van/ shoot/ guy
+
+While other topics are more chatter/junk related.
+
+
+By using gamma, we can then assign each document with a topic
 ```{r}
 topic_gamma <- tidy(topic, matrix = "gamma")
 topic_gamma <- topic_gamma %>% 
   group_by(document) %>% 
   slice(which.max(gamma))
 
-topic_gamma$document<-as.numeric(topic_gamma$document)
-topic_gamma[order(topic_gamma$document),]
-
+topic_gamma$document<-as.numeric(topic_gamma$document) 
+topic_gamma[order(topic_gamma$document),] %>% group_by(topic) %>% count() 
+head(topic_gamma%>% arrange(desc(-document)))
 ```
+```{r}
+id_time <- data %>% select(c("id","time_1min"))
 
+topic_data<-left_join(topic_gamma,id_time,by=c("document"="id"))
+
+#manually put topics in LDA results
+
+topic_c<- c(1,2,3,4,5,6,7,8,9,10)  
+topics_c <- c("police related","chatter1","chatter2","chatter3","POK leaders",
+"evacuation & hostages","chatter4","junk","fire","van")
+topic_df<-data.frame(topic_c,topics_c )
+
+topic_data<-left_join(topic_data,topic_df,by=c("topic"="topic_c"))
+
+topic_data %>% group_by(time_1min,topics_c) %>% count() %>% 
+  ggplot(aes(x=time_1min))+
+  geom_bar(aes(y=n), stat = "identity",fill = "black")+
+  facet_wrap(~topics_c)+
+  ggtitle("Topics Trend")
+```
+```{r}
+unique(topic_data$topics_c)
+```
 
 
 
@@ -387,7 +429,7 @@ set.seed(321)
 model <- BTM(tidytxtdata, k = 20, beta = 0.01, background = TRUE, iter = 500, trace = 100) #Run the model
 
 topicterms <- terms(model, top_n = 10) #View the topics
-topicterms
+#topicterms
 ```
 ```{r}
 library(textplot)
@@ -396,7 +438,54 @@ library(concaveman)
 plot(model)
 ```
 
+To identify chatter/junk/spam from meaningful events. Firstly, let's find out the relationship of number of tweets and retwewts of a single author. 
 
+```{r}
+tweet<-data %>%
+  filter(author!="NA") %>% 
+  group_by(author) %>%
+  count()
+
+retweet<-data %>%
+  group_by(RT_from) %>%
+  count()
+
+colnames(tweet)[2]<-"tweet"
+colnames(retweet)[2]<-"retweet"
+
+
+tweet_retweet<-left_join(tweet, retweet, by = c("author"="RT_from"))%>% 
+    mutate_each(funs(replace(., which(is.na(.)), 0))) %>% 
+  arrange(desc(tweet,retweet))
+
+
+tweet_retweet$ratio<- tweet_retweet$retweet/tweet_retweet$tweet
+
+head(tweet_retweet %>% arrange(ratio))
+
+
+# p=ggplot(tweet_retweet , aes(x=tweet, y=retweet)) +
+#   geom_point()+
+#   geom_abline(coef = c(0,1))+
+#   geom_text(data = filter(tweet_retweet, tweet>=40|retweet>=40),aes(label=author))
+# 
+# ggplotly(p)
+plot_ly(data=tweet_retweet %>% filter(author!="KronosQuoth"), #exclude @Kronosquoth for aesthetic purpose
+        x=~tweet,
+        y=~retweet,
+        text= ~author)
+```
+
+From the chart above, we can notice that user with number of tweets does not have any retweets, such as @Clevvah4Evah, @KronosQuoth. On the other hand, authors with high re tweet frequency are HomelandIlluminations,
+@AbilaPost, @KronosStar,  @CentralBulletin , @NewsOnlineToday , and @InternationalNews, of which the post were more meaningful information to the public. 
+
+
+```{r}
+#net_edge<-data %>% select(c('RT_from','author')) %>% arrange(desc(RT_from)) %>% filter(RT_from!="")
+#net_node<-tweet_retweet%>% select(c('author','retweet'))%>% filter(retweet>0)
+
+
+```
 
 #4.2 Use visual analytics to represent and evaluate how the level of the risk to the public evolves over the course of the evening. Consider the potential consequences of the situation and the number of people who could be affected. Please limit your answer to 10 images and 1000 words.
 
@@ -418,17 +507,12 @@ ggplot(count,aes(x=time_1min,y=count_of_posts,fill=type))+
          geom_bar(stat="identity",position="dodge")+
   # geom_abline(h=mean, col = "black")+
   theme(axis.text.x = element_text(angle = 90, hjust = 1))+
-  
   ggtitle("Total Number of Posts through the period")
-```
-With time interval at 1 minute, the number of posts trend is plotted as above. The peaks of both ccdata and mbdata are observed during time 19:40-19:50, 18:45:00 and 20:10:00. 
 
-
-
-
-```{r}
 head(count[order(-count$count_of_posts),],10)
 ```
+
+With time interval at 1 minute, the number of posts trend is plotted as above. The peaks of both ccdata and mbdata are observed during time 19:40-19:50, 18:45:00 and 20:10:00. 
 
 
 ##Number of retweets/tweets
@@ -436,10 +520,10 @@ head(count[order(-count$count_of_posts),],10)
 ```{r}
 data_rt2<-data %>% 
    #filter(str_detect(message, "fire")) %>% 
-  select(c("author","time_1min","message","RT")) %>% 
+  select(c("author","time_1min","message","RT_from")) %>% 
   group_by(time_1min) %>% 
   summarise(post=n(),
-            rt_post=sum(RT!=""))
+            rt_post=sum(RT_from!=""))
 
 data_rt2$time_1min=ymd_hms(data_rt2$time_1min)
 
@@ -463,7 +547,7 @@ The goverment can monitor the ratio of retweet in community to detect abnormal e
 
 ##Important news source - Mainstream media/ ccdata /KOL
 
-Noticed that the mainstream media (with name starting with capital letter and frequently re-tweet by public) and call center are official media for Abila.
+Noticed that the mainstream media (with name starting with capital letter and frequently re-tweet by public) and call center are actively quoted media for Abila.
 
 ```{r}
 # check if the media is mainstream media
@@ -472,45 +556,60 @@ data_RT %>%
   filter(RT_from!=author) %>% 
   count(RT_from) %>% 
   arrange(desc(n)) %>% 
-  filter(n>10) # filter the retweet over 10 times by public
+  filter(n>40) # filter the retweet over 10 times by public
 
 ```
 
-@HomelandIlluminations/@AbilaPost/@KronosStar/@CentralBulletin/@NewsOnlineToday are top5 social media in area of Abila. Their tweet should be closely moniored by government, in particular, when the frequency of re-tweet from the public has rised.
+@HomelandIlluminations/@AbilaPost/@KronosStar/@CentralBulletin/@NewsOnlineToday/@InternationalNews are top6 social media in area of Abila. Their tweet should be closely monitored by local authorities, in particular, when the frequency of re-tweet from the public has raised.
 
-For example for HomelandIlluminations, we can monitor the words and its relationships in re-tweets.
+For instance, to understand people's attehntion of the abnormal events, we can monitor the words and its relationships in main stream media's re-tweets.
 
 ```{r}
 #convert dataframe to corpus
 
-library(udpipe)
-library(igraph)
-library(ggraph)
-library(ggplot2)
 
-data_RT$id <- seq.int(nrow(data_RT))
-data_RT_subset<-data_RT %>% select(c("id","RT_message"))
-data_RT_subset$cleaned <- str_replace_all(data_RT_subset$RT_message, 'rt ', '')
+data_RT_main<-data %>% 
+  filter(RT_from==c("HomelandIlluminations","AbilaPost",
+                    "KronosStar","CentralBulletin",
+                    "NewsOnlineToday","InternationalNews"))
+
+
+data_RT_main$id <- seq.int(nrow(data_RT_main))
+data_RT_subset<-data_RT_main %>% select(c("id","RT_message"))
+
+
+data_RT_subset$RT_message_cleaned<-
+  tolower(data_RT_subset$RT_message)%>%   # transform all message to lower cases
+  replace_contraction()%>%   #replace contractions with long form
+  replace_word_elongation()%>% 
+  str_replace_all("[0-9]", "") %>% #removing numbers
+  str_replace_all("([,=!.?$+%-&#@])","")%>% #remove punctuations
+  str_replace_all("abila|abilapost|centralbulletin|kronosstar|pok|rally","")%>% 
+  removeWords(stopwords("english"))%>% 
+  str_squish()%>% 
+  str_trim %>% 
+  lemmatize_strings()
+
 
 x<-data_RT_subset %>% 
-  unnest_tokens(word, RT_message)
+  unnest_tokens(word, RT_message_cleaned)
 
 x<-cooccurrence(x, group = "id", term = "word")
 
 plt <- textplot_cooccurrence(x,
-                             title = "Re-tweet Co-occurrences", top_n = 25)
-  
+                             title = "Re-tweet Co-occurrences", top_n = 150)
+
 plt
 ```
 
-
+In the retweet from the main media, high occurrence of fire at dolphine apartement has the most co-occurance of retweets in the community, indicating highest attention and highest risk in the community, followed by several events involved with police such as post of pokrally/ arrive at scene. While in the edge of the plot , we can found that the public was also interested in retweet firefighter injure at hospital/ suspect arrest.
 
 
 tf-idf from call center
 
 
 ```{r}
-data %>% filter(author=="FriendsOfKronos")
+#data %>% filter(author=="FriendsOfKronos")
 ```
 
 
@@ -534,9 +633,9 @@ At 18:25:00, user GreyCatCollectibles first posted "Smell something funny upstai
 ```
 
 ```{r}
-data %>% 
-   filter(author=="GreyCatCollectibles") %>% 
-  select(c("author","timestamp","message"))
+# data %>% 
+#    filter(author=="GreyCatCollectibles") %>% 
+#   select(c("author","timestamp","message"))
 
 ```
 
@@ -549,33 +648,13 @@ data %>%
 
 
 
-  
-```{r}
 
-head(fire)
-```
 
-retrive RT from message
-```{r}
-regex <- "RT @([A-Za-z]+[A-Za-z0-9_]+)(?![A-Za-z0-9_]*\\.)"
-regex2 <- "@([A-Za-z]+[A-Za-z0-9_]+)(?![A-Za-z0-9_]*\\.)"
-regex3 <- "RT @([A-Za-z]+[A-Za-z0-9_]+)(?![A-Za-z0-9_]*\\.) "
-data$RT_pattern<-str_extract_all(data$message, regex, simplify = TRUE)
-data$RT_from<-  str_extract_all(data$RT_pattern, regex2, simplify = TRUE)
-data$RT_message <- str_replace_all(data$message,regex3,"")
-```
 
 ```{r}
-data_RT<- data %>% 
-  filter(RT_from!="")
-
-head(data_RT)
-```
-
-```{r}
-data_RT %>% 
-  count(RT_message) %>% 
-  arrange(desc(n))
+# data_RT %>% 
+#   count(RT_message) %>% 
+#   arrange(desc(n))
 
 ```
 
@@ -584,61 +663,64 @@ data_RT %>%
 
 
 ```{r}
-nrow(data_RT)
-length(unique(data_RT[["message"]]))
-
-#data_RT<-data_RT %>% select(c("author","message","RT_from"))
-
-
-RT_edges_aggregated <- data_RT %>%
-  group_by(RT_from,author) %>%
-    summarise(Weight = n()) %>%
-  filter(Weight > 1) %>%
-  ungroup()
-
-data_RT
+# data_RT <- data %>% filter(RT_from!="")
+# 
+# RT_edges_aggregated <- data_RT %>%select(c("RT_from","author"))
 
 
-RT_graph <- tbl_graph(
-                           edges = RT_edges_aggregated, 
-                           directed = TRUE)
+# RT_edges_aggregated <- data_RT %>%
+#   group_by(RT_from,author) %>%
+#     summarise(Weight = n()) %>%
+#   filter(Weight > 1) %>%
+#   ungroup()
 
+# tweet_retweet<-left_join(tweet, retweet, by = c("author"="RT_from"))%>% 
+#     mutate_each(funs(replace(., which(is.na(.)), 0))) %>% 
+# 
+# RT_edges_aggregated<-left_join(RT_edges_aggregated,tweet_retweet %>% select(c("author","retweet"))
+#           , by=c("RT_from"="author"))
+
+# 
+# RT_graph <- tbl_graph(nodes = 
+#                            edges = RT_edges_aggregated, 
+#                            directed = TRUE)
+# g <- ggraph(RT_graph, 
+#             layout = "nicely") + 
+#   geom_edge_link(aes()) +
+#   geom_node_point(aes(size = Weight))
+# g + theme_graph()
 ```
 
 ```{r}
-g <- ggraph(RT_graph, 
-            layout = "nicely") + 
-  geom_edge_link(aes()) +
-  geom_node_point(aes(size = 3))
-g + theme_graph()
+
 ```
 
 
 ```{r}
-data_RT %>% 
-  group_by(RT_from,RT_message,author) %>% 
-  count(timestamp) %>% 
-  ungroup()
-
-
-RT_edges_aggregated <- data_RT %>%
-  group_by(message,author) %>%
-    summarise(Weight = n()) %>%
-  filter(Weight >= 1) %>%
-  ungroup()
-
-RT_edges_aggregated 
-
-
-RT_graph <- tbl_graph(
-                           edges = RT_edges_aggregated, 
-                           directed = TRUE)
-
-g <- ggraph(RT_graph, 
-            layout = "nicely") + 
-  geom_edge_link(aes()) +
-  geom_node_point(aes(size = 3))
-g + theme_graph()
+# data_RT %>% 
+#   group_by(RT_from,RT_message,author) %>% 
+#   count(timestamp) %>% 
+#   ungroup()
+# 
+# 
+# RT_edges_aggregated <- data_RT %>%
+#   group_by(message,author) %>%
+#     summarise(Weight = n()) %>%
+#   filter(Weight >= 1) %>%
+#   ungroup()
+# 
+# RT_edges_aggregated 
+# 
+# 
+# RT_graph <- tbl_graph(
+#                            edges = RT_edges_aggregated, 
+#                            directed = TRUE)
+# 
+# g <- ggraph(RT_graph, 
+#             layout = "nicely") + 
+#   geom_edge_link(aes()) +
+#   geom_node_point(aes(size = 3))
+# g + theme_graph()
   
 ```
 
@@ -646,57 +728,57 @@ messages from call center
 
 
 ```{r}
-packages= c('raster','sf','clock','tmap','tidyverse')
-
-for(p in packages){
-  if(!require(p,character.only= T)){
-    install.packages(p)
-    }
-  library(p, character.only = T)
-}
+# packages= c('raster','sf','clock','tmap','tidyverse')
+# 
+# for(p in packages){
+#   if(!require(p,character.only= T)){
+#     install.packages(p)
+#     }
+#   library(p, character.only = T)
+# }
 ```
 
 
 ```{r}
-bgmap<- raster("data/MC3/Geospatial/MC2-tourist.tif")
-bgmap
-
-tmap_mode("plot") #interactive view
-
-tm_shape(bgmap) +
-  tm_rgb(bgmap, r=1, g=2, b=3,
-         alpha=NA,
-         saturation = 1,
-         interpolate = TRUE,
-         max.value = 255)
+# bgmap<- raster("data/MC3/Geospatial/MC2-tourist.tif")
+# bgmap
+# 
+# tmap_mode("plot") #interactive view
+# 
+# tm_shape(bgmap) +
+#   tm_rgb(bgmap, r=1, g=2, b=3,
+#          alpha=NA,
+#          saturation = 1,
+#          interpolate = TRUE,
+#          max.value = 255)
 ```
 
 
 ```{r}
-cc_data<-data %>% 
-  filter(type=="ccdata")
-
-docs <- Corpus(VectorSource(as.character(cc_data$cleaned)))
-
-inspect(docs[1:2])
-
-# Create a document-term-matrix
-
-dtm <- TermDocumentMatrix(docs) 
-matrix <- as.matrix(dtm) 
-words <- sort(rowSums(matrix),decreasing=TRUE) 
-
-# words and frequency dataframe
-df <- data.frame(word = names(words),freq=words)
-
-#word cloud
-wordcloud(words = df$word, freq = df$freq, min.freq = 5,           max.words=200, random.order=FALSE, rot.per=0.35,            colors=brewer.pal(8, "Dark2"))
+# cc_data<-data %>% 
+#   filter(type=="ccdata")
+# 
+# docs <- Corpus(VectorSource(as.character(cc_data$cleaned)))
+# 
+# inspect(docs[1:2])
+# 
+# # Create a document-term-matrix
+# 
+# dtm <- TermDocumentMatrix(docs) 
+# matrix <- as.matrix(dtm) 
+# words <- sort(rowSums(matrix),decreasing=TRUE) 
+# 
+# # words and frequency dataframe
+# df <- data.frame(word = names(words),freq=words)
+# 
+# #word cloud
+# wordcloud(words = df$word, freq = df$freq, min.freq = 5,           max.words=200, random.order=FALSE, rot.per=0.35,            colors=brewer.pal(8, "Dark2"))
 
 
 ```
 
 ```{r}
-write.csv(data,"data/data.csv")
+# write.csv(data,"data/data.csv")
 ```
 
 
@@ -704,39 +786,43 @@ write.csv(data,"data/data.csv")
 Then, frequency of the author
 
 ```{r}
-groupby_author<-data %>% 
-  group_by(author) %>% 
-  count %>% 
-  ungroup
+# groupby_author<-data %>% 
+#   group_by(author) %>% 
+#   count %>% 
+#   ungroup
 ```
 
 
 
 ```{r}
-data_2<-data %>%
-     group_by(author) %>%
-     dplyr::summarise(all_posts=paste(message, collapse=" "))
-
-sotu_firsts_nouns <- PrepText(data_2, groupvar = "author", textvar = "all_posts", node_type = "groups", tokenizer = "tweets", pos = "nouns", remove_stop_words = FALSE, compound_nouns = TRUE)
+# data_2<-data %>%
+#      group_by(author) %>%
+#      dplyr::summarise(all_posts=paste(message, collapse=" "))
+# 
+# sotu_firsts_nouns <- PrepText(data_2, groupvar = "author", textvar = "all_posts", node_type = "groups", tokenizer = "tweets", pos = "nouns", remove_stop_words = FALSE, compound_nouns = TRUE)
 
 # <- PrepTextSent(data_2, groupvar = "author", textvar = "cleaned", node_type = "groups", 
                                       #tokenizer = "words", sentiment_lexicon = "afinn", language = "english", udmodel_lang = #udmodel_lang, remove_numbers = NULL, compound_nouns = TRUE)
 
-sotu_firsts_network <- CreateTextnet(sotu_firsts_nouns)
+# sotu_firsts_network <- CreateTextnet(sotu_firsts_nouns)
 
 ```
 ```{r}
 #VisTextNet(sotu_firsts_network,label_degree_cut = 0)
-VisTextNetD3(sotu_firsts_network)
+# VisTextNetD3(sotu_firsts_network)
 ```
 
 ```{r}
-sotu_firsts_communities <- TextCommunities(sotu_firsts_network)
-top_words_modularity_classes <- InterpretText(sotu_firsts_network, sotu_firsts_nouns)
-text_centrality <- TextCentrality(sotu_firsts_network)
+# sotu_firsts_communities <- TextCommunities(sotu_firsts_network)
+# top_words_modularity_classes <- InterpretText(sotu_firsts_network, sotu_firsts_nouns)
+# text_centrality <- TextCentrality(sotu_firsts_network)
 ```
 
 
 #4.3 If you were able to send a team of first responders to any single place, where would it be? Provide your rationale. How might your response be different if you had to respond to the events in real time rather than retrospectively? Please limit your answer to 8 images and 500 words
 
+critize ccdata
+#Reference
 
+Junghoon Chae, Dennis Thom, Yun Jang, SungYe Kim, Thomas Ertl, David S. Ebert,
+Public behavior response analysis in disaster events utilizing visual analytics of microblog data,Computers & Graphics,Volume 38,2014,Pages 51-60,ISSN 0097-8493,https://doi.org/10.1016/j.cag.2013.10.008.
