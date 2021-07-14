@@ -46,7 +46,7 @@ Then their study also analyzed spatial pattern of Twitter users after the tornad
 Besides, the abnormality score are calculated with Latent Dirichlet Allocation (LDA) topic modeling and Seasonal-Trend Decomposition to detect severe weather condition.
 
 
-![Abnormality of the first topic](image/Abnormality of the first topic.jpg)
+![Abnormality of the first topic](image/Abnormality of the first topic.jpg){ width=50% }
 
 Given the limitation of MC3 data set, we cannot visualize spatial heatmap, but we can try to leverage on LDA modeling and abnormality detection methodology to detect the crisis in Abila community. 
 
@@ -60,11 +60,11 @@ They think "the size of the nodes represents the number of the blog being post. 
 
 However, if we can consider the correlation of text in two blogs would be better.
 
-## 
+## Relationship or text and text entities visualization
 
 [Textnets](https://github.com/cbail/textnets) is a R package for automated text analysis using network techniques.It provides network for both text and text entities, which provides visualization ability to uncover correlation of texts in documents.
 
-![Textnet with R](image/Textnet.png) 
+![Textnet with R](image/Textnet.png) { width=70% }
 
 This visualization can be applied in the question 2 in answering the potential consequences of the situation and the number of people who could be affected via network graph.
 
@@ -152,17 +152,12 @@ data$cleaned<-data$message %>%
   str_squish()%>% #trim whitespace from a string 
   lemmatize_strings()#removes whitespace from start and end of string
 
-
-
-head(subset(data,select=c("message","cleaned")))
+#head(subset(data,select=c("message","cleaned")))
 
 
 ```
 
-```{r}
-#data%>% filter(data$cleaned=="")
-```
-retrive RT from message
+Retrieve RT/ hashtags from message
 ```{r}
 regex <- "RT @([A-Za-z]+[A-Za-z0-9_-]+)(?![A-Za-z0-9_]*\\.)"
 regex2 <- "@([A-Za-z]+[A-Za-z0-9_-]+)(?![A-Za-z0-9_]*\\.)"
@@ -219,11 +214,6 @@ data_subset=subset(data,select=c("time_30min","cleaned"))
 
 ```
 
-```{r}
-words_count<-data_subset%>% 
-  unnest_tokens(word, cleaned) %>%
-  count(time_30min,word, sort = TRUE)
-```
 
 
 # 4.Data Visualization for Challenge Questions
@@ -236,7 +226,7 @@ words_count<-data_subset%>%
 First the data is split by 30 minutes time interval and perform wordcloud, to visualize the most frequent words in the microblog.
 
 
-```{r}
+```{r,fig.width=8, fig.height=8}
 
 data$timestamp <- ymd_hms(data$`date(yyyyMMddHHmmss)`)
 data$time_30min = cut(data$timestamp, breaks="30 min")
@@ -275,7 +265,7 @@ From the visualization, we can tell the main content discussing in the community
 
 Then, by applying Term Frequency – Inverse document frequency (tf-idf) to bigram texts, we can uncover more information compared with unigrams. 
 
-```{r}
+```{r,fig.width=12, fig.height=10}
 
 
 bigrams <- data_subset%>%
@@ -344,7 +334,7 @@ terms(topic,5)
 Extract per-topic-per-word probabilities ,β(“beta”), from the model. The higher the value, the more important of the words to the topic.
 
 
-```{r}
+```{r,fig.width=12, fig.height=10}
 ap_topics <- tidy(topic, matrix = "beta")
 
 
@@ -364,15 +354,20 @@ ap_top_terms %>%
 As shown above, the meaningful keywords can be found in each topic.
 
 Topic 1 - police related as words mentioning police/standoff/crowd 
+
 Topic 5 - several pok leaders are mentioned
+
 Topic 6 - resident evacuation and hostages
+
 Topic 9 - fire at dancing dolphin
+
 topic 10- van/ shoot/ guy
 
 While other topics are more chatter/junk related.
 
 
-By using gamma, we can then assign each document with a topic
+By using gamma, we can then assign each document with a topic。
+
 ```{r}
 topic_gamma <- tidy(topic, matrix = "gamma")
 topic_gamma <- topic_gamma %>% 
@@ -380,10 +375,9 @@ topic_gamma <- topic_gamma %>%
   slice(which.max(gamma))
 
 topic_gamma$document<-as.numeric(topic_gamma$document) 
-topic_gamma[order(topic_gamma$document),] %>% group_by(topic) %>% count() 
-head(topic_gamma%>% arrange(desc(-document)))
-```
-```{r}
+#topic_gamma[order(topic_gamma$document),] %>% group_by(topic) %>% count() 
+#(topic_gamma%>% arrange(desc(-document)))
+
 id_time <- data %>% select(c("id","time_1min"))
 
 topic_data<-left_join(topic_gamma,id_time,by=c("document"="id"))
@@ -401,15 +395,16 @@ topic_data %>% group_by(time_1min,topics_c) %>% count() %>%
   ggplot(aes(x=time_1min))+
   geom_bar(aes(y=n), stat = "identity",fill = "black")+
   facet_wrap(~topics_c)+
-  ggtitle("Topics Trend")
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())+
+  ggtitle("Topics Trend from 1700-2130")
 ```
-```{r}
-unique(topic_data$topics_c)
-```
+
+From the topic trend distribution, we can see that chatter topic 1-4 are spreaded all over the time period, and the number of junk posts are small and evenly distributed. While the peaks of key major events are very obvious at certain point of time. Through topic modeling techniques, we can identify major event from junk/chatter/spam, and thetopic trend visualization can help the audience know about temporal pattern of meanningful events distribution.
 
 
-
-```{r}
+```{r,echo=FALSE}
 #Tokenize data
 tidytxtdata<- tidy(dtm)
                     
@@ -430,68 +425,63 @@ model <- BTM(tidytxtdata, k = 20, beta = 0.01, background = TRUE, iter = 500, tr
 
 topicterms <- terms(model, top_n = 10) #View the topics
 #topicterms
-```
-```{r}
+
 library(textplot)
 library(ggraph)
 library(concaveman)
 plot(model)
 ```
 
-To identify chatter/junk/spam from meaningful events. Firstly, let's find out the relationship of number of tweets and retwewts of a single author. 
+
+Then, let's take a closer look of the relationship of number of tweets and re-tweets from a single author. 
 
 ```{r}
 tweet<-data %>%
   filter(author!="NA") %>% 
   group_by(author) %>%
-  count()
+  count() %>% 
+  ungroup()
 
 retweet<-data %>%
   group_by(RT_from) %>%
-  count()
+  count()%>% 
+  ungroup()
+
 
 colnames(tweet)[2]<-"tweet"
 colnames(retweet)[2]<-"retweet"
 
 
-tweet_retweet<-left_join(tweet, retweet, by = c("author"="RT_from"))%>% 
-    mutate_each(funs(replace(., which(is.na(.)), 0))) %>% 
-  arrange(desc(tweet,retweet))
+tweet_retweet<-left_join(tweet, retweet, by = c("author"="RT_from"))
 
+is.na(tweet_retweet$retweet)<-0
 
-tweet_retweet$ratio<- tweet_retweet$retweet/tweet_retweet$tweet
+tweet_retweet$retweet_ratio<- tweet_retweet$retweet/tweet_retweet$tweet
+tweet_retweet$tweet_scale <-scale(tweet_retweet$tweet)
+tweet_retweet$tweet_scale <-as.numeric(tweet_retweet$tweet_scale)
 
-head(tweet_retweet %>% arrange(ratio))
+fig<- plot_ly(data=tweet_retweet,
+        x=~retweet_ratio,
+        y=~tweet_scale,
+        text= ~paste("Author:",author,
+                     "Tweet:",tweet,
+                     "Re-Tweet",retweet))
 
-
-# p=ggplot(tweet_retweet , aes(x=tweet, y=retweet)) +
-#   geom_point()+
-#   geom_abline(coef = c(0,1))+
-#   geom_text(data = filter(tweet_retweet, tweet>=40|retweet>=40),aes(label=author))
-# 
-# ggplotly(p)
-plot_ly(data=tweet_retweet %>% filter(author!="KronosQuoth"), #exclude @Kronosquoth for aesthetic purpose
-        x=~tweet,
-        y=~retweet,
-        text= ~author)
+fig %>% layout(autosize = F, width = 100, height = 100)
+fig
 ```
 
-From the chart above, we can notice that user with number of tweets does not have any retweets, such as @Clevvah4Evah, @KronosQuoth. On the other hand, authors with high re tweet frequency are HomelandIlluminations,
-@AbilaPost, @KronosStar,  @CentralBulletin , @NewsOnlineToday , and @InternationalNews, of which the post were more meaningful information to the public. 
+I calculaed the tweets and retweets numbers and retweets ratio of a single user and plot the retweet_ratio and tweet numbers(scaled value) as a scatter plot.
+
+From the chart above, we can notice that user with number of tweets does not have any retweets, such as @Clevvah4Evah, @KronosQuoth are mainly posting junk/spam blogs. On the other hand, authors with high re-tweet frequency are HomelandIlluminations,
+@AbilaPost, @KronosStar,  @CentralBulletin , @NewsOnlineToday , and @InternationalNews, of which the post were more active and meaningful information to the public.
 
 
-```{r}
-#net_edge<-data %>% select(c('RT_from','author')) %>% arrange(desc(RT_from)) %>% filter(RT_from!="")
-#net_node<-tweet_retweet%>% select(c('author','retweet'))%>% filter(retweet>0)
+##4.2 Use visual analytics to represent and evaluate how the level of the risk to the public evolves over the course of the evening. Consider the potential consequences of the situation and the number of people who could be affected. Please limit your answer to 10 images and 1000 words.
 
+### Risk Level 
 
-```
-
-#4.2 Use visual analytics to represent and evaluate how the level of the risk to the public evolves over the course of the evening. Consider the potential consequences of the situation and the number of people who could be affected. Please limit your answer to 10 images and 1000 words.
-
-
-
-##Number of posts 
+#### Number of posts 
 
 ```{r}
 count <- data %>%
@@ -512,10 +502,10 @@ ggplot(count,aes(x=time_1min,y=count_of_posts,fill=type))+
 head(count[order(-count$count_of_posts),],10)
 ```
 
-With time interval at 1 minute, the number of posts trend is plotted as above. The peaks of both ccdata and mbdata are observed during time 19:40-19:50, 18:45:00 and 20:10:00. 
+With time interval at 1 minute, the sum number of posts is plotted as above. The peaks of both ccdata and mbdata are observed during time 19:40-19:50, 18:45:00 and 20:10:00. 
 
 
-##Number of retweets/tweets
+####  Number of retweets/tweets
 
 ```{r}
 data_rt2<-data %>% 
@@ -538,16 +528,77 @@ ggplot(data_rt2,aes(x=time_1min)) +
     geom_bar(aes(y=post), stat = "identity",fill = "red") +
     geom_bar(aes(y=rt_post), stat = "identity",fill = "blue") +
     theme(axis.text.x = element_text(angle = 90, hjust = 1))+
-    ggtitle("Tweet and RT")
+    ggtitle("Tweet and Re-Tweets Trend")
 
 ```
 Another way to detect the active level of microblog is to visualize the proportion of re-tweet/tweet. As shown in the bar graph above, the peak trend coincides with "Total Number of Posts through the period", indicating the people are actively eveloved in the events happening in Abila.
 
 The goverment can monitor the ratio of retweet in community to detect abnormal event.
 
-##Important news source - Mainstream media/ ccdata /KOL
 
-Noticed that the mainstream media (with name starting with capital letter and frequently re-tweet by public) and call center are actively quoted media for Abila.
+
+### Network Analysis of people affected
+
+At 18:25:00, user GreyCatCollectibles first posted "Smell something funny upstairs - wish this renovation work would get finished!", followed by his post"Yuck - electrical smell is getting worse","OMG -- really smells like smoke now" in 10 minutes, making him the first person detecting the fire at dancing dolphin.
+
+
+```{r}
+RT_edges_aggregated <-data_RT%>%
+  group_by(RT_from,author) %>%
+  count() %>%
+  ungroup()
+
+RT_nodes_aggregated <-data%>%
+  group_by(author) %>%
+  count() %>%
+  ungroup
+
+# RT_graph <- tbl_graph(nodes=RT_nodes_aggregated,
+#                            edges = RT_edges_aggregated,
+#                            directed = TRUE)
+
+# g <- RT_graph %>%
+#   mutate(betweenness_centrality = centrality_betweenness()) %>%
+#   ggraph(layout = "nicely") +
+#   geom_edge_link(color = "lightblue") +
+#   geom_node_point(aes(color = author,size=n))+
+#   theme(legend.position = "none")
+ # geom_node_text(aes(label = ifelse(n>60,author,NA_character_)),repel=TRUE)
+
+RT_nodes_aggregated$id<-seq.int(nrow(RT_nodes_aggregated))
+RT_nodes_aggregated<-RT_nodes_aggregated %>% 
+  rename(label=author)
+
+RT_edges_aggregated_viz<-
+  left_join(RT_edges_aggregated,RT_nodes_aggregated,by=c("RT_from"="label")) %>% 
+  rename(from=id) %>% 
+  left_join(RT_nodes_aggregated,by=c("author"="label")) %>% 
+  rename(to=id)
+
+RT_edges_aggregated_viz<-subset(RT_edges_aggregated_viz,select=c("from","to"))
+
+ visNetwork(RT_nodes_aggregated, 
+            RT_edges_aggregated_viz , 
+            main = "Retweet Network")%>%
+   visOptions(highlightNearest = TRUE)%>%
+   visNodes(label="label",color = list(background = "lightblue", 
+                        border = "darkblue",
+                        highlight = "yellow"))  %>% 
+  visIgraphLayout(layout = "layout_with_fr")
+
+```
+
+Visnetwork packages in R provided interactive capability for network visualization. For the plot above, click the nodes and zoom in the graph, the selected node and its network  will be highlighted, which can provided the information of how many people are directly affected by the original author. By using force-directed layout algorithm, the authors in the center like @HomelandIlluminations/@AbilaPost/@KronosStar/@CentralBulletin/@NewsOnlineToday/@InternationalNews have affected the public most directly and widely.
+
+
+
+#### Monitor important news source - Mainstream media
+
+Noticed that the mainstream media (with name starting with capital letter and frequently re-tweet by public) are actively quoted media for Abila.
+
+@HomelandIlluminations/@AbilaPost/@KronosStar/@CentralBulletin/@NewsOnlineToday/@InternationalNews are top6 social media in area of Abila. Their tweet should be closely monitored by local authorities, in particular, when the frequency of re-tweet from the public has raised.
+
+For instance, to understand people's attehntion of the abnormal events, we can monitor the words and its relationships in main stream media's re-tweets.
 
 ```{r}
 # check if the media is mainstream media
@@ -558,15 +609,7 @@ data_RT %>%
   arrange(desc(n)) %>% 
   filter(n>40) # filter the retweet over 10 times by public
 
-```
-
-@HomelandIlluminations/@AbilaPost/@KronosStar/@CentralBulletin/@NewsOnlineToday/@InternationalNews are top6 social media in area of Abila. Their tweet should be closely monitored by local authorities, in particular, when the frequency of re-tweet from the public has raised.
-
-For instance, to understand people's attehntion of the abnormal events, we can monitor the words and its relationships in main stream media's re-tweets.
-
-```{r}
 #convert dataframe to corpus
-
 
 data_RT_main<-data %>% 
   filter(RT_from==c("HomelandIlluminations","AbilaPost",
@@ -601,105 +644,26 @@ plt <- textplot_cooccurrence(x,
 
 plt
 ```
-
-In the retweet from the main media, high occurrence of fire at dolphine apartement has the most co-occurance of retweets in the community, indicating highest attention and highest risk in the community, followed by several events involved with police such as post of pokrally/ arrive at scene. While in the edge of the plot , we can found that the public was also interested in retweet firefighter injure at hospital/ suspect arrest.
-
-
-tf-idf from call center
-
+In the retweet from the main media, high occurrence of fire at dolphin apartement has the most co-occurrence re-tweets, indicating highest attention and risk in the community, followed by several events involved with police such as post of pokrally/ arrive at scene. While in the edge of the visualization, we can found that the small group of public was  interested in re-tweet firefighter injure at hospital/ suspect arrest, which has less risk in the community.
 
 ```{r}
-#data %>% filter(author=="FriendsOfKronos")
-```
-
-
-
-
-##the most popular retweets – word cloud// textnets
-##real-time co-occurrence of texts
-
-
-
-
-
-
-
-
-At 18:25:00, user GreyCatCollectibles first posted "Smell something funny upstairs - wish this renovation work would get finished!", followed by his post"Yuck - electrical smell is getting worse","OMG -- really smells like smoke now" in 10 minutes, making him the first person detecting the fire at dancing dolphin.
-
-```{r}
-#author_post<-data %>% count(author)
-#author_post[order(author_post$n),]
-```
-
-```{r}
-# data %>% 
-#    filter(author=="GreyCatCollectibles") %>% 
-#   select(c("author","timestamp","message"))
-
-```
-
-
-
-
-
-
-
-
-
-
-
-
-
-```{r}
-# data_RT %>% 
-#   count(RT_message) %>% 
-#   arrange(desc(n))
-
-```
-
-
-
-
-
-```{r}
-# data_RT <- data %>% filter(RT_from!="")
+# RT_edges_aggregated <- RT_edges_aggregated %>%
+#   rename(from = RT_from,to=author,Weight=n)
 # 
-# RT_edges_aggregated <- data_RT %>%select(c("RT_from","author"))
-
-
-# RT_edges_aggregated <- data_RT %>%
-#   group_by(RT_from,author) %>%
-#     summarise(Weight = n()) %>%
-#   filter(Weight > 1) %>%
-#   ungroup()
-
-# tweet_retweet<-left_join(tweet, retweet, by = c("author"="RT_from"))%>% 
-#     mutate_each(funs(replace(., which(is.na(.)), 0))) %>% 
+# RT_nodes_aggregated <-RT_nodes_aggregated %>% 
+#   rename(to=author,Weight=n)
 # 
-# RT_edges_aggregated<-left_join(RT_edges_aggregated,tweet_retweet %>% select(c("author","retweet"))
-#           , by=c("RT_from"="author"))
-
 # 
-# RT_graph <- tbl_graph(nodes = 
-#                            edges = RT_edges_aggregated, 
-#                            directed = TRUE)
-# g <- ggraph(RT_graph, 
-#             layout = "nicely") + 
-#   geom_edge_link(aes()) +
-#   geom_node_point(aes(size = Weight))
-# g + theme_graph()
-```
-
-```{r}
+# visNetwork(RT_nodes_aggregated, 
+#            RT_edges_aggregated )
 
 ```
 
 
 ```{r}
-# data_RT %>% 
-#   group_by(RT_from,RT_message,author) %>% 
-#   count(timestamp) %>% 
+# data_RT %>%
+#   group_by(RT_from,RT_message,author) %>%
+#   count(timestamp) %>%
 #   ungroup()
 # 
 # 
@@ -709,19 +673,17 @@ At 18:25:00, user GreyCatCollectibles first posted "Smell something funny upstai
 #   filter(Weight >= 1) %>%
 #   ungroup()
 # 
-# RT_edges_aggregated 
-# 
 # 
 # RT_graph <- tbl_graph(
-#                            edges = RT_edges_aggregated, 
+#                            edges = RT_edges_aggregated,
 #                            directed = TRUE)
 # 
-# g <- ggraph(RT_graph, 
-#             layout = "nicely") + 
-#   geom_edge_link(aes()) +
-#   geom_node_point(aes(size = 3))
-# g + theme_graph()
-  
+# g <- ggraph(RT_graph,
+#             layout = "nicely") +
+#   geom_edge_link() +
+#   geom_node_point()
+# g
+#   
 ```
 
 messages from call center 
@@ -800,15 +762,15 @@ Then, frequency of the author
 #      dplyr::summarise(all_posts=paste(message, collapse=" "))
 # 
 # sotu_firsts_nouns <- PrepText(data_2, groupvar = "author", textvar = "all_posts", node_type = "groups", tokenizer = "tweets", pos = "nouns", remove_stop_words = FALSE, compound_nouns = TRUE)
-
-# <- PrepTextSent(data_2, groupvar = "author", textvar = "cleaned", node_type = "groups", 
-                                      #tokenizer = "words", sentiment_lexicon = "afinn", language = "english", udmodel_lang = #udmodel_lang, remove_numbers = NULL, compound_nouns = TRUE)
-
+# 
+# sotu_firsts_nouns <- PrepTextSent(data_2, groupvar = "author", textvar = "cleaned", node_type = "groups",
+#                                        tokenizer = "words", sentiment_lexicon = "afinn", language = "english", udmodel_lang = udmodel_lang, remove_numbers = NULL, compound_nouns = TRUE)
+#  
 # sotu_firsts_network <- CreateTextnet(sotu_firsts_nouns)
 
 ```
 ```{r}
-#VisTextNet(sotu_firsts_network,label_degree_cut = 0)
+# VisTextNet(sotu_firsts_network,label_degree_cut = 0)
 # VisTextNetD3(sotu_firsts_network)
 ```
 
