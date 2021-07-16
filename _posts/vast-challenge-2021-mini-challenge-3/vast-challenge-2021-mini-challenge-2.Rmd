@@ -16,7 +16,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(fig.retina = 3,
-  echo = TRUE,
+  echo = FALSE,
                       eval = TRUE,
                       message = FALSE,
                       warning=FALSE)
@@ -41,12 +41,13 @@ Then their study also analyzed spatial pattern of Twitter users after the tornad
 
 
 ![Spatial pattern of Twitter users during 24 h in the city of Moore after damages from a strong tornado.](image/Spatial pattern of Twitter users.jpg)
-(1)the heatmap shows a normal situation of Twitter user distribution in the same area of which the distribution is very different from the situation after the tornado event. As such, the spatial analytics can help with disaster management according to twitter heatmap distribution.
+(1)the heatmap shows a normal situation of Twitter user distribution in the same area of which the distribution is very different from the situation after the tornado event. As such, the spatial analytics can help with post disaster management according to twitter heatmap distribution, for example, the authority can allocate more resources to the most visited places by the public
 
 Besides, the abnormality score are calculated with Latent Dirichlet Allocation (LDA) topic modeling and Seasonal-Trend Decomposition to detect severe weather condition.
 
+![Abnormality of the first topic](image/Abnormality of the first topic.jpg){ width=50%}
 
-![Abnormality of the first topic](image/Abnormality of the first topic.jpg){ width=50% }
+
 
 Given the limitation of MC3 data set, we cannot visualize spatial heatmap, but we can try to leverage on LDA modeling and abnormality detection methodology to detect the crisis in Abila community. 
 
@@ -56,9 +57,9 @@ Given the limitation of MC3 data set, we cannot visualize spatial heatmap, but w
 In [Visual Analytics Benchmark Repository 2014](http://visualdata.wustl.edu/varepository/VAST%20Challenge%202014/challenges/MC3%20-%20Real-Time,%20Streaming%20Social%20Media/), the submission from [Tianjin University](http://visualdata.wustl.edu/varepository/VAST%20Challenge%202014/challenges/MC3%20-%20Real-Time,%20Streaming%20Social%20Media/entries/Tianjin%20University/) demonstrated a network approach in identifying junk tweet.
 
 ![Retweet Network](image/Re-tweet network.png)
-They think "the size of the nodes represents the number of the blog being post. Notice that there are several nodes which have the larger size but no relationship with others which means theirs blogs are ignored by others.". This is a very good intuition to visualize center and edges microblog user. 
+They think "the size of the nodes represents the number of the blog being post. Notice that there are several nodes which have the larger size but no relationship with others which means theirs blogs are ignored by others.". This is a very good intuition to visualize center and edges microblog users. 
 
-However, if we can consider the correlation of text in two blogs would be better.
+HI believe this visualization can be further improved with visnetwork interactivity.
 
 ## Relationship or text and text entities visualization
 
@@ -67,6 +68,28 @@ However, if we can consider the correlation of text in two blogs would be better
 ![Textnet with R](image/Textnet.png) { width=70% }
 
 This visualization can be applied in the question 2 in answering the potential consequences of the situation and the number of people who could be affected via network graph.
+
+## GeoVisual Analysis
+
+Several benchmark teams in 2014 had insightful geovisual analytics with microblog text analytics,
+
+For example, for submission from [Peking University](http://visualdata.wustl.edu/varepository/VAST%20Challenge%202014/challenges/MC3%20-%20Real-Time,%20Streaming%20Social%20Media/entries/Peking%20University/), they pointed the location of major events shooting/standoff, fire and hit as well as possible route of black van; for submission from [Purdue University](http://visualdata.wustl.edu/varepository/VAST%20Challenge%202014/challenges/MC3%20-%20Real-Time,%20Streaming%20Social%20Media/entries/Purdue%20University/), they analyzed the complete trajectory of black van from shooting and hit/run events.
+
+![Map and Routine from Peking University](image/peking map.png)
+![Black Van Trajectory from Purdue University](image/Purdue University.png)
+
+With understanding of microblog posting for detailed location, we can review and investigate the kidnap event and find possible locations of suspects. These are good approaches for retrospective investigation. While for real time response, we can try to be more flexible to detect the abnormality in microblogs in time with appropriate text mining techniques.
+
+## Combination of Geographical and Text Visualization 
+
+
+It is also worth mentioning one of a innovated combination visualization from [Purdue University](http://visualdata.wustl.edu/varepository/VAST%20Challenge%202014/challenges/MC3%20-%20Real-Time,%20Streaming%20Social%20Media/entries/Purdue%20University/).
+
+![Combined Visualization from Purdue University](image/Purdue University-combined.png)
+As highliged in the example as above, a)temporal pattern of the microblog posting from different sources are tracked properly, b) word cloud of the most frequent words provided information of popular words/topics discussed, C) network graph provides the key opinion leader and its impact to the public, d) and e) detailed microblog posted by ccdata and mbdata, besides, they highlighed the geo location of the events and streets mentioned by call center.
+ 
+This visualization is a very good inspiration on how a live tweets can be tracked and visualized with single data set. The analytics has applied various feature engineering techniques for numerical variables, text mining and network relationships. The fruitful and dynamic information from this single combination graph can really help audience to understand the overall situation and make quick decisions or responses to the event.
+
 
 
 
@@ -83,7 +106,7 @@ packages= c('raster','sf','clock','tmap',
             'BTM','textplot','concaveman','ggwordcloud',
             'qdapDictionaries','textstem','devtools','textnets',
             'ggiraph','plotly','igraph', 'tidygraph', 
-             'ggraph', 'visNetwork','udpipe')
+             'ggraph', 'visNetwork','udpipe','grid')
 
 for(p in packages){
   if(!require(p,character.only= T)){
@@ -111,10 +134,10 @@ data_20_2130=read_csv("data/MC3/csv-2001-2131.csv")
 data=rbindlist(list(data_17_1830,data_1830_20,data_20_2130))
 
 #print head of data
-head(data)
+knitr::kable(head(data[, 1:5]), "pipe")
 
 ```
- 
+
 
 ## 3.2 Change date type
 
@@ -122,12 +145,10 @@ head(data)
 
 #timestamp in lubridate
 data$timestamp <- ymd_hms(data$`date(yyyyMMddHHmmss)`)
-
 data$time_1min = cut(data$timestamp, breaks="1 min")
 
 ```
 
- 
  
 ## 3.3 Text Data Preprocessing
 
@@ -152,12 +173,13 @@ data$cleaned<-data$message %>%
   str_squish()%>% #trim whitespace from a string 
   lemmatize_strings()#removes whitespace from start and end of string
 
-#head(subset(data,select=c("message","cleaned")))
-
+knitr::kable(head(subset(data,select=c("message","cleaned"))), "pipe")
 
 ```
 
-Retrieve RT/ hashtags from message
+Retrieve RT/ hashtags from message by using regex techniques
+
+
 ```{r}
 regex <- "RT @([A-Za-z]+[A-Za-z0-9_-]+)(?![A-Za-z0-9_]*\\.)"
 regex2 <- "@([A-Za-z]+[A-Za-z0-9_-]+)(?![A-Za-z0-9_]*\\.)"
@@ -169,22 +191,28 @@ data$RT_from<-  str_extract_all(data$RT_pattern, regex2, simplify = TRUE)
 data$RT_from<-  str_replace(data$RT_from, "@","")
 data$RT_message <- str_replace_all(data$message,regex3,"")
 
-data$hashtag <- str_extract_all(data$message, regex2, simplify = FALSE)
-data$user_mentioned <- str_extract_all(data$message, regex4, simplify = FALSE)
+data$hashtag <- str_extract_all(data$message, regex4, simplify = FALSE)
+data$user_mentioned <- str_extract_all(data$message, regex2, simplify = FALSE)
 
+
+data$hashtag<-data$hashtag %>% 
+  str_replace_all("character\\(0\\)|c\\(|\\)","")
+
+data$user_mentioned<-data$user_mentioned%>% 
+  str_replace_all("character\\(0\\)|c\\(|\\)","")
 
 data_RT<- data %>% 
   filter(RT_from!="")
 
-#head(data)
+head(data)
 ```
 
+Use world cloud to show most frequent words/hastags/tagged users.
  
-```{r}
+```{r,warning=FALSE}
 
 #convert dataframe to corpus
 docs <- Corpus(VectorSource(as.character(data$cleaned)))
-
 inspect(docs[1:2])
 
 # Create a document-term-matrix
@@ -201,32 +229,90 @@ wordcloud(words = df$word, freq = df$freq, min.freq = 5,           max.words=200
 #wordcloud2(data=df, size=1.6, color='random-dark')
 
 ```
+```{r,echo=FALSE}
+#convert dataframe to corpus
 
 
-```{r}
+docs <- Corpus(VectorSource(as.character(data$hashtag)))
+inspect(docs[1:2])
 
-#as_datetime(data$time_1min)
+# Create a document-term-matrix
+
+dtm <- TermDocumentMatrix(docs) 
+matrix <- as.matrix(dtm) 
+words <- sort(rowSums(matrix),decreasing=TRUE) 
+
+# words and frequency dataframe
+df <- data.frame(word = names(words),freq=words)
+
+#word cloud
+wordcloud(words = df$word, freq = df$freq, min.freq = 5,           max.words=200, random.order=FALSE, rot.per=0.35,            colors=brewer.pal(8, "Dark2"))
+#wordcloud2(data=df, size=1.6, color='random-dark')
+```
+```{r,echo=FALSE}
+#convert dataframe to corpus
+
+
+docs <- Corpus(VectorSource(as.character(data$user_mentioned)))
+inspect(docs[1:2])
+
+# Create a document-term-matrix
+
+dtm <- TermDocumentMatrix(docs) 
+matrix <- as.matrix(dtm) 
+words <- sort(rowSums(matrix),decreasing=TRUE) 
+
+# words and frequency dataframe
+df <- data.frame(word = names(words),freq=words)
+
+#word cloud
+wordcloud(words = df$word, freq = df$freq, min.freq = 5,           max.words=200, random.order=FALSE, rot.per=0.35,            colors=brewer.pal(8, "Dark2"))
+#wordcloud2(data=df, size=1.6, color='random-dark')
+```
+### __Messages from Call Center__
+
+
+```{r,fig.width=12,fig.height= 12}
+cc_data<-select(data,"type", "message","timestamp","location")%>% 
+  filter(type=="ccdata")
+
+cc_data2<-cc_data %>% 
+  group_by(message) %>%
+  count() %>% 
+  arrange(desc(n))
+
+
+ggplot(cc_data2,aes(x=reorder(message,n), y=n)) +
+  geom_bar(stat='identity') +
+  coord_flip()
+
+
+```
+# 4.Data Visualization for Challenge Questions
+
+
+
+## Question1
+
+__4.1 Using visual analytics, characterize the different types of content in the dataset. What distinguishes meaningful event reports from typical chatter from junk or spam? Please limit your answer to 8 images and 500 words.__
+
+
+
+### __Wordcloud trend of 30 minutes time interval__
+
+
+Split data by 30 minutes time interval and perform  worldcloud, to visualize the most frequent words in the microblog.
+
+
+```{r,fig.width=9, fig.height=9,warning=FALSE}
+
+#split data into 30 minutes time interval
 data$timestamp <- ymd_hms(data$`date(yyyyMMddHHmmss)`)
 data$time_30min = cut(data$timestamp, breaks="30 min")
 data$id <- seq.int(nrow(data))
 
 data_subset=subset(data,select=c("time_30min","cleaned"))
 
-```
-
-
-
-# 4.Data Visualization for Challenge Questions
-
-
-
-## 4.1 Using visual analytics, characterize the different types of content in the dataset. What distinguishes meaningful event reports from typical chatter from junk or spam? Please limit your answer to 8 images and 500 words.
-
-
-First the data is split by 30 minutes time interval and perform wordcloud, to visualize the most frequent words in the microblog.
-
-
-```{r,fig.width=8, fig.height=8}
 
 data$timestamp <- ymd_hms(data$`date(yyyyMMddHHmmss)`)
 data$time_30min = cut(data$timestamp, breaks="30 min")
@@ -243,27 +329,43 @@ usenet_words<-data_subset%>%
 
 usenet_words[order(usenet_words$time_30min),]
 
+usenet_words$time_30min<-usenet_words$time_30min %>% str_replace_all("2014-01-23 ","")
+  
+l1<-c("18:30:00","19:30:00","17:00:00","19:00:00","20:00:00","20:30:00","18:00:00","17:30:00","21:00:00","21:30:00")
+Time_30min<-c("18:30-19:00","19:30-20:00","17:00-17:30","19:00-19:30","20:00-20:30","20:30-21:00","18:00-18:30","17:30-18:00","21:00-21:31","21:00-21:31")
+time_30min_df<-data.frame(l1,Time_30min)
+usenet_words<-left_join(usenet_words,time_30min_df,by=c("time_30min"="l1"))
+
+
 
 set.seed(1234)
 usenet_words %>%
-  group_by(time_30min) %>% 
+  group_by(Time_30min) %>% 
   slice_max(order_by = n, n = 20) %>% 
 ggplot(aes(label = word,
            size = n)) +
   geom_text_wordcloud() +
   theme_minimal() +
-  facet_wrap(~time_30min)
+  facet_wrap(~Time_30min)
 ```
 
 From the visualization, we can tell the main content discussing in the community are
 
-1700-1830 pok rally in park with several name mentioned such as cylvia, jakab, viktor
-1830-1930 fire at dancing dolphin partment, police and evacuation.
-1930-2000 shooting and cops/police
-2100-2130 van/ hostage/ explosion
+1700-1830 pok rally in park with several name mentioned such as cylvia, jakab, viktor;
+
+1830-1930 fire at dancing dolphin partment, police and evacuation;
+
+1930-2000 shooting and cops/police;
+
+2100-2131 van/ hostage/ explosion;
+
+
+
+### __TF_IDF of 30 mintunes time interval__
 
 
 Then, by applying Term Frequency – Inverse document frequency (tf-idf) to bigram texts, we can uncover more information compared with unigrams. 
+
 
 ```{r,fig.width=12, fig.height=10}
 
@@ -274,7 +376,7 @@ bigrams <- data_subset%>%
                 cleaned, 
                 token = "ngrams", 
                 n = 2) %>%
-  count(time_30min,word, sort = TRUE)
+  count(time_30min,word, sort = TRUE) %>% ungroup()
 
 
 tf_idf <- bigrams%>%
@@ -300,9 +402,10 @@ tf_idf %>%
 
 
 Without having to process more on data, the contents of the microblogs with 30 mins time interval is even more informative.
+
 For instance, from 1700-1800, we know that police presense at pok rally and Dr. Audrey is mentioned several times from 1800. Then from 1830 , fire occurs at dolphin apartment and followed by evacuation. Then, from 1930, a shot/gun fire happened with police involved, followed by injured firefighter and  hospitalization. And from 2100 suspects were arrested and followed by an explosion at dolphin apartment from 2130 onward. 
 
-
+### __Topic Modeling - Distinguish Junk/Spam/Chatter from Meaningful Events__
 
 Then, to distinguish meaningful events from chatter/junk/spam messages, I will then perform topic modeling to identify topic in each microblogs.
 
@@ -366,6 +469,8 @@ topic 10- van/ shoot/ guy
 While other topics are more chatter/junk related.
 
 
+### __Topic Trend__
+
 By using gamma, we can then assign each document with a topic。
 
 ```{r}
@@ -404,7 +509,7 @@ topic_data %>% group_by(time_1min,topics_c) %>% count() %>%
 From the topic trend distribution, we can see that chatter topic 1-4 are spreaded all over the time period, and the number of junk posts are small and evenly distributed. While the peaks of key major events are very obvious at certain point of time. Through topic modeling techniques, we can identify major event from junk/chatter/spam, and thetopic trend visualization can help the audience know about temporal pattern of meanningful events distribution.
 
 
-```{r,echo=FALSE}
+```{r,echo=FALSE,results=FALSE}
 #Tokenize data
 tidytxtdata<- tidy(dtm)
                     
@@ -431,7 +536,7 @@ library(ggraph)
 library(concaveman)
 plot(model)
 ```
-
+### __Tweets and Retweets Comparison of Users__
 
 Then, let's take a closer look of the relationship of number of tweets and re-tweets from a single author. 
 
@@ -467,21 +572,19 @@ fig<- plot_ly(data=tweet_retweet,
                      "Tweet:",tweet,
                      "Re-Tweet",retweet))
 
-fig %>% layout(autosize = F, width = 100, height = 100)
-fig
+fig %>% layout(autosize = F,title="Authors' Tweet and Reweet Status")
 ```
 
-I calculaed the tweets and retweets numbers and retweets ratio of a single user and plot the retweet_ratio and tweet numbers(scaled value) as a scatter plot.
 
 From the chart above, we can notice that user with number of tweets does not have any retweets, such as @Clevvah4Evah, @KronosQuoth are mainly posting junk/spam blogs. On the other hand, authors with high re-tweet frequency are HomelandIlluminations,
 @AbilaPost, @KronosStar,  @CentralBulletin , @NewsOnlineToday , and @InternationalNews, of which the post were more active and meaningful information to the public.
 
 
-##4.2 Use visual analytics to represent and evaluate how the level of the risk to the public evolves over the course of the evening. Consider the potential consequences of the situation and the number of people who could be affected. Please limit your answer to 10 images and 1000 words.
+## Question 2
 
-### Risk Level 
+__4.2 Use visual analytics to represent and evaluate how the level of the risk to the public evolves over the course of the evening. Consider the potential consequences of the situation and the number of people who could be affected. Please limit your answer to 10 images and 1000 words.__
 
-#### Number of posts 
+### __Number of posts__ 
 
 ```{r}
 count <- data %>%
@@ -505,7 +608,7 @@ head(count[order(-count$count_of_posts),],10)
 With time interval at 1 minute, the sum number of posts is plotted as above. The peaks of both ccdata and mbdata are observed during time 19:40-19:50, 18:45:00 and 20:10:00. 
 
 
-####  Number of retweets/tweets
+### __Tweets and Retweets Trend__
 
 ```{r}
 data_rt2<-data %>% 
@@ -537,9 +640,8 @@ The goverment can monitor the ratio of retweet in community to detect abnormal e
 
 
 
-### Network Analysis of people affected
+### __Network Analysis of people affected__
 
-At 18:25:00, user GreyCatCollectibles first posted "Smell something funny upstairs - wish this renovation work would get finished!", followed by his post"Yuck - electrical smell is getting worse","OMG -- really smells like smoke now" in 10 minutes, making him the first person detecting the fire at dancing dolphin.
 
 
 ```{r}
@@ -553,17 +655,7 @@ RT_nodes_aggregated <-data%>%
   count() %>%
   ungroup
 
-# RT_graph <- tbl_graph(nodes=RT_nodes_aggregated,
-#                            edges = RT_edges_aggregated,
-#                            directed = TRUE)
 
-# g <- RT_graph %>%
-#   mutate(betweenness_centrality = centrality_betweenness()) %>%
-#   ggraph(layout = "nicely") +
-#   geom_edge_link(color = "lightblue") +
-#   geom_node_point(aes(color = author,size=n))+
-#   theme(legend.position = "none")
- # geom_node_text(aes(label = ifelse(n>60,author,NA_character_)),repel=TRUE)
 
 RT_nodes_aggregated$id<-seq.int(nrow(RT_nodes_aggregated))
 RT_nodes_aggregated<-RT_nodes_aggregated %>% 
@@ -583,16 +675,37 @@ RT_edges_aggregated_viz<-subset(RT_edges_aggregated_viz,select=c("from","to"))
    visOptions(highlightNearest = TRUE)%>%
    visNodes(label="label",color = list(background = "lightblue", 
                         border = "darkblue",
-                        highlight = "yellow"))  %>% 
+                        highlight = "yellow"),
+            size=)  %>% 
   visIgraphLayout(layout = "layout_with_fr")
 
 ```
 
 Visnetwork packages in R provided interactive capability for network visualization. For the plot above, click the nodes and zoom in the graph, the selected node and its network  will be highlighted, which can provided the information of how many people are directly affected by the original author. By using force-directed layout algorithm, the authors in the center like @HomelandIlluminations/@AbilaPost/@KronosStar/@CentralBulletin/@NewsOnlineToday/@InternationalNews have affected the public most directly and widely.
 
+Similarly, we can also track the blog retweet trend.
+
+```{r}
+
+RT_graph <- tbl_graph(nodes=RT_nodes_aggregated,
+                           edges = RT_edges_aggregated,
+                           directed = TRUE)
+
+g <- RT_graph %>%
+  mutate(betweenness_centrality = centrality_betweenness()) %>%
+  ggraph(layout = "nicely") +
+  geom_edge_link(color = "lightblue") +
+  geom_node_point(aes(color = label,size=n))+
+  theme(legend.position = "none")
 
 
-#### Monitor important news source - Mainstream media
+g
+
+```
+
+
+
+### __Monitor important news source - Mainstream media__
 
 Noticed that the mainstream media (with name starting with capital letter and frequently re-tweet by public) are actively quoted media for Abila.
 
@@ -686,35 +799,10 @@ In the retweet from the main media, high occurrence of fire at dolphin apartemen
 #   
 ```
 
-messages from call center 
 
 
-```{r}
-# packages= c('raster','sf','clock','tmap','tidyverse')
-# 
-# for(p in packages){
-#   if(!require(p,character.only= T)){
-#     install.packages(p)
-#     }
-#   library(p, character.only = T)
-# }
-```
 
-
-```{r}
-# bgmap<- raster("data/MC3/Geospatial/MC2-tourist.tif")
-# bgmap
-# 
-# tmap_mode("plot") #interactive view
-# 
-# tm_shape(bgmap) +
-#   tm_rgb(bgmap, r=1, g=2, b=3,
-#          alpha=NA,
-#          saturation = 1,
-#          interpolate = TRUE,
-#          max.value = 255)
-```
-
+`
 
 ```{r}
 # cc_data<-data %>% 
@@ -781,9 +869,162 @@ Then, frequency of the author
 ```
 
 
-#4.3 If you were able to send a team of first responders to any single place, where would it be? Provide your rationale. How might your response be different if you had to respond to the events in real time rather than retrospectively? Please limit your answer to 8 images and 500 words
+## Question 3
+__4.3 If you were able to send a team of first responders to any single place, where would it be? Provide your rationale. How might your response be different if you had to respond to the events in real time rather than retrospectively? Please limit your answer to 8 images and 500 words.__
 
-critize ccdata
+To send team of responders and make sure right location and short responding time, we can take a closely look location-tagged posts or posts contents with locations.
+
+__On retrospective appraoch, I will send team of first responders to dolphin dancing apartment.__
+
+Reasons as below,
+
+1) The fire event at dolphin get the most attention and risk from the public according to previous analysis.
+
+2) This event has the accurate location and it breaks out at early time around 18:40. 
+
+At 18:25:00, user GreyCatCollectibles first posted "Smell something funny upstairs - wish this renovation work would get finished!", followed by his post"Yuck - electrical smell is getting worse","OMG -- really smells like smoke now" in 10 minutes, making him the first person detecting the fire, but we couldn't know where he is located. 
+
+Subsequently, call center posted "POSSIBLE FIRE-REPORT" from N. Achilleos St / N. Madeg St and N. Madeg St / N. Acera St, and main stream social media HomelandIlluminations and KronosStar reported the exact location of the fire at Achilleos & Madeg and Dancing Dolphin apartment. User dangermice is the first mbdata user posted the location tagged tweet"i think the dancin dolphin is on fire!" on 18:42:10.
+
+
+
+```{r}
+packages= c('sp','sf','gridExtra')
+
+for(p in packages){
+  if(!require(p,character.only= T)){
+    install.packages(p)
+    }
+  library(p, character.only = T)
+}
+
+```
+
+```{r,echo=FALSE}
+abila<-st_read('data/MC3/Geospatial/Abila.shp',quiet=TRUE)
+
+
+data_location <- data %>% 
+  filter(longitude!="" ) %>% 
+  add_count(longitude,latitude,author)
+
+dangermice <- data_location %>% 
+  filter(author=="dangermice" ) %>% 
+  select(timestamp,message,longitude,latitude) 
+#%>% 
+  # str_replace_all(dangermice,timestamp,"2014-01-23 ","")
+  # 
+
+
+p1<-ggplot()+
+  geom_sf(data=abila,size=1,color="black",fill="cyan1")+
+  ggtitle("Fire at Dancing Dolphin Apartment")+
+  coord_sf()+
+  theme(panel.background = element_rect(fill = "transparent"), # bg of the panel
+    plot.background = element_rect(fill = "transparent", color = NA), # bg of the plot
+    panel.grid.major = element_blank(), # get rid of major grid
+    panel.grid.minor = element_blank(), # get rid of minor grid
+    legend.background = element_rect(fill = "transparent"), # get rid of legend bg
+    legend.box.background = element_rect(fill = "transparent"),# get rid of legend panel bg)
+    axis.text.x = element_blank(),
+  axis.text.y = element_blank(),
+  axis.ticks = element_blank(),
+  axis.title.y=element_blank(),
+  axis.title.x =element_blank()) +
+  geom_point(data = dangermice, aes(x = longitude,y=latitude),color="red",size=5)
+
+
+
+data_fire <- data %>% 
+  filter(str_detect(message,"fire|explosion|dolpin")) %>% 
+  select(message, timestamp,cleaned) %>% 
+  unnest_tokens(word, cleaned)
+
+data_fire_words <- data_fire %>%
+  count(word, sort = TRUE) %>%
+  ungroup() %>% 
+  arrange(desc(n))
+
+
+p2<- ggplot(head(data_fire_words,50),aes(label = word,
+           size = n,color=n)) +
+  geom_text_wordcloud()+
+  scale_size_area(max_size = 10) +
+  theme(panel.background = element_rect(fill = "transparent"), # bg of the panel
+    plot.background = element_rect(fill = "transparent", color = NA))+
+  scale_color_gradient(low = "darkred", high = "red")
+
+data$time_1min<-str_replace_all(data$time_1min,"2014-01-23 ","")
+
+p3<-data %>% 
+  filter(str_detect(message,"fire|explosion|dolpin")) %>% 
+  group_by(time_1min) %>% 
+  count() %>%
+  ungroup() %>% 
+  ggplot(aes(x=time_1min))+
+  geom_bar(aes(y=n), stat = "identity",fill = "black")+
+  theme(axis.title.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.title.x=element_blank(),
+        panel.background = element_rect(fill = "transparent"),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())+
+        ggtitle("Posts with Dolphin Apartment")
+
+
+```
+
+
+```{r,echo=FALSE}
+
+# Move to a new page
+grid.newpage()
+# Create layout : nrow = 2, ncol = 2
+pushViewport(viewport(layout = grid.layout(2, 2)))
+# A helper function to define a region on the layout
+
+define_region <- function(row, col){
+  viewport(layout.pos.row = row, layout.pos.col = col)
+} 
+# Arrange the plots
+print(p1, vp=define_region(1, 1))
+print(p2, vp = define_region(1, 2))
+print(p3, vp = define_region(2, 1:2))
+```
+
+__If it's real time, I will arrange the trajectory of the team according to the status of the event and its location.__
+
+```{r}
+data_location <- data %>% 
+  filter(longitude!="",str_detect(message,"hit|van|shoot|driver") ) %>% 
+  add_count(longitude,latitude,author)
+
+dangermice <- data_location %>% 
+  filter(author=="dangermice" ) %>% 
+  select(timestamp,message) 
+
+
+
+ggplot()+
+  geom_sf(data=abila,size=1,color="black",fill="cyan1")+
+  ggtitle("Abila")+
+  coord_sf()+
+  theme(panel.background = element_rect(fill = "transparent"), # bg of the panel
+    plot.background = element_rect(fill = "transparent", color = NA), # bg of the plot
+    panel.grid.major = element_blank(), # get rid of major grid
+    panel.grid.minor = element_blank(), # get rid of minor grid
+    legend.background = element_rect(fill = "transparent"), # get rid of legend bg
+    legend.box.background = element_rect(fill = "transparent"),# get rid of legend panel bg)
+    axis.text.x = element_blank(),
+  axis.text.y = element_blank(),
+  axis.ticks = element_blank()) +
+  geom_point(data = data_location, aes(x = longitude,y=latitude,color=author,size=5))+
+  geom_line(data=data_location, aes(x=longitude, y=latitude), color="red", size=1)
+
+
+```
+
 #Reference
 
 Junghoon Chae, Dennis Thom, Yun Jang, SungYe Kim, Thomas Ertl, David S. Ebert,
